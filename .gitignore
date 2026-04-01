@@ -1,0 +1,51 @@
+# Large data directories (store separately / large binary files)
+features/
+results/
+heatmaps/
+eval_results/
+splits/
+raw_slides/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Environment
+.env
+conda-lock.yml
+
+# Logs
+*.log
+events.out.tfevents.*
+
+# Model checkpoints (large)
+*.pt
+*.pth
+*.ckpt
+
+# WSI image files (large binary)
+*.h5
+*.hdf5
+*.svs
+*.sdpc
+*.tiff
+*.tif
+*.ndpi
+*.mrxs

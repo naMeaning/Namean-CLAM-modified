@@ -1,0 +1,23 @@
+Experiment: MIL
+
+Fold summary from eval summary.csv
+mean_test_auc = 0.4994
+std_test_auc  = 0.1817
+mean_test_acc = 0.5157
+std_test_acc  = 0.0784
+
+Overall slide-level out-of-fold metrics
+auc         = 0.5122
+acc         = 0.5141
+f1          = 0.0936
+sensitivity = 0.0533
+specificity = 0.9231
+tn=156, fp=13, fn=142, tp=8
+
+Case-level metrics
+auc         = 0.4286
+acc         = 0.4231
+f1          = 0.0000
+sensitivity = 0.0000
+specificity = 0.9167
+tn=11, fp=1, fn=14, tp=0

@@ -1,0 +1,23 @@
+Experiment: CLAM_MB_noWS
+
+Fold summary from eval summary.csv
+mean_test_auc = 0.5817
+std_test_auc  = 0.2070
+mean_test_acc = 0.5215
+std_test_acc  = 0.1226
+
+Overall slide-level out-of-fold metrics
+auc         = 0.5757
+acc         = 0.5266
+f1          = 0.5519
+sensitivity = 0.6200
+specificity = 0.4438
+tn=75, fp=94, fn=57, tp=93
+
+Case-level metrics
+auc         = 0.5655
+acc         = 0.5769
+f1          = 0.6452
+sensitivity = 0.7143
+specificity = 0.4167
+tn=5, fp=7, fn=4, tp=10

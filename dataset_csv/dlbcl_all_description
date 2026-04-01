@@ -1,0 +1,9 @@
+原始数据集:
+  tcga_dlbcl: 39 切片, 39 患者
+  nanchang_dlbcl: 389 切片, 50 患者
+  dlbcl_morph: 183 切片, 132 患者
+
+合并后:
+  总切片: 611
+  总患者: 221
+  GCB: 294, non-GCB: 317
