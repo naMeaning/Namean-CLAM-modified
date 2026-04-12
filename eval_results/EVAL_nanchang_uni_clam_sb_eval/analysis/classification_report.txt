@@ -1,0 +1,112 @@
+============================================================
+分类报告 (Classification Report)
+============================================================
+
+
+--- Fold 0 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.75      0.90      0.82        20
+         GCB       0.75      0.50      0.60        12
+
+    accuracy                           0.75        32
+   macro avg       0.75      0.70      0.71        32
+weighted avg       0.75      0.75      0.74        32
+
+--- Fold 1 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.57      0.93      0.70        14
+         GCB       0.86      0.38      0.52        16
+
+    accuracy                           0.63        30
+   macro avg       0.71      0.65      0.61        30
+weighted avg       0.72      0.63      0.61        30
+
+--- Fold 2 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.78      0.26      0.39        27
+         GCB       0.38      0.86      0.52        14
+
+    accuracy                           0.46        41
+   macro avg       0.58      0.56      0.46        41
+weighted avg       0.64      0.46      0.43        41
+
+--- Fold 3 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.40      0.71      0.51        14
+         GCB       0.64      0.32      0.42        22
+
+    accuracy                           0.47        36
+   macro avg       0.52      0.52      0.47        36
+weighted avg       0.54      0.47      0.46        36
+
+--- Fold 4 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.57      0.80      0.67        20
+         GCB       0.43      0.20      0.27        15
+
+    accuracy                           0.54        35
+   macro avg       0.50      0.50      0.47        35
+weighted avg       0.51      0.54      0.50        35
+
+--- Fold 5 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.82      0.75      0.78        12
+         GCB       0.83      0.88      0.86        17
+
+    accuracy                           0.83        29
+   macro avg       0.83      0.82      0.82        29
+weighted avg       0.83      0.83      0.83        29
+
+--- Fold 6 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.35      0.43      0.39        14
+         GCB       0.33      0.27      0.30        15
+
+    accuracy                           0.34        29
+   macro avg       0.34      0.35      0.34        29
+weighted avg       0.34      0.34      0.34        29
+
+--- Fold 7 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.80      0.44      0.57        18
+         GCB       0.47      0.82      0.60        11
+
+    accuracy                           0.59        29
+   macro avg       0.64      0.63      0.59        29
+weighted avg       0.68      0.59      0.58        29
+
+--- Fold 8 ---
+              precision    recall  f1-score   support
+
+     non-GCB       0.50      0.57      0.53        14
+         GCB       0.50      0.43      0.46        14
+
+    accuracy                           0.50        28
+   macro avg       0.50      0.50      0.50        28
+weighted avg       0.50      0.50      0.50        28
+
+--- Fold 9 ---
+              precision    recall  f1-score   support
+
+     non-GCB       1.00      0.31      0.48        16
+         GCB       0.56      1.00      0.72        14
+
+    accuracy                           0.63        30
+   macro avg       0.78      0.66      0.60        30
+weighted avg       0.79      0.63      0.59        30
+
+============================================================
+总体混淆矩阵 (Aggregated Confusion Matrix)
+============================================================
+
+              non-GCB  GCB
+non-GCB        100     69
+GCB             68     82

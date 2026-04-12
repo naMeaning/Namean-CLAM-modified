@@ -1,0 +1,52 @@
+data_arguments:
+  data_dir: raw_slides/
+  label_dict:
+    GCB: 0
+    non-GCB: 1
+  preset: presets/bwh_biopsy.csv
+  process_list: process_list_dlbcl.csv
+  slide_ext: .sdpc
+encoder_arguments:
+  model_name: resnet50_trunc
+  target_img_size: 224
+exp_arguments:
+  batch_size: 256
+  n_classes: 2
+  production_save_dir: heatmaps/heatmap_production_results
+  raw_save_dir: heatmaps/heatmap_raw_results
+  save_exp_code: dlbcl_clam_mb_heatmap
+heatmap_arguments:
+  alpha: 0.4
+  binarize: false
+  binary_thresh: -1
+  blank_canvas: false
+  blur: false
+  calc_heatmap: true
+  cmap: jet
+  custom_downsample: 1
+  save_ext: jpg
+  save_orig: true
+  use_center_shift: true
+  use_ref_scores: false
+  use_roi: false
+  vis_level: -1
+model_arguments:
+  ckpt_path: results/dlbcl_gcb_nongcb_clam_mb_s1/s_0_checkpoint.pt
+  drop_out: 0.0
+  embed_dim: 1024
+  initiate_fn: initiate_model
+  model_size: small
+  model_type: clam_mb
+  n_classes: 2
+patching_arguments:
+  custom_downsample: 1
+  overlap: 0
+  patch_level: 0
+  patch_size: 256
+sample_arguments:
+  samples:
+  - k: 15
+    mode: topk
+    name: topk_high_attention
+    sample: true
+    seed: 1

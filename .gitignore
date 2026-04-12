@@ -1,10 +1,10 @@
 # Large data directories (store separately / large binary files)
 features/
-results/
-heatmaps/
-eval_results/
-splits/
+
 raw_slides/
+results/morph_dlbcl/
+results/nanchang_dlbcl/
+results/tcga_dlbcl/
 
 # Python
 __pycache__/
