@@ -33,7 +33,7 @@ conda-lock.yml
 
 # Logs
 *.log
-events.out.tfevents.*
+
 
 # Model checkpoints (large)
 *.pt
