@@ -85,3 +85,4 @@ The framework supports several Multiple Instance Learning (MIL) architectures fo
 ## License
 
 This project is licensed under the GNU GENERAL PUBLIC LICENSE Version 3. See `LICENSE.md` for details.
+# Namean-CLAM-modified

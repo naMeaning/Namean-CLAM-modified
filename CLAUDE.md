@@ -37,9 +37,109 @@ python main.py --task task_3_dlbcl_coo --dataset nanchang --exp_code nanchang_cl
 - `--model_type`: `clam_sb`（单分支）、`clam_mb`（多分支）或 `mil`
 - `--task`: 任务名称（如 `task_1_tumor_vs_normal`、`task_2_tumor_subtyping`、`task_3_dlbcl_coo`）
 - `--dataset`: DLBCL数据集选择（`nanchang`、`tcga`、`morph`、`all`）
+- `--feature_type`: 特征类型选择（`resnet` 或 `uni`）
 - `--bag_loss`: 切片级别损失函数（`ce` 或 `svm`）
-- `--inst_loss`: 实例级别聚类损失（`svm` 或 `ce`）
+- `--inst_loss`: 实例级别聚类损失（`svm` 或 `ce`，仅CLAM有效）
+- `--bag_weight`: Bag损失权重（1.0=只用bag loss，0.7=标准配置）
+- `--no_inst_cluster`: 关闭instance-level聚类
 - `--k`: 折数
+
+### 模型选择建议
+- `mil`: 最简单的MIL基线，适合调试和对比
+- `clam_sb` + `--bag_weight 1.0 --no_inst_cluster`: 纯bag-level分类，排除聚类干扰
+- `clam_sb`（标准）: 同时使用bag-level和instance-level损失
+
+## 常见问题与解决方案
+
+### 1. CLAM 聚类反转问题
+
+**现象**: 训练时 instance clustering 准确率接近 100%，但验证时 AUC 接近 0
+
+```
+训练日志:
+  class 0 clustering acc 1.0: correct 2616/2616
+  class 1 clustering acc 1.0: correct 2616/2616  ✓ 聚类完美
+
+验证日志:
+  Val Set, val_loss: 6.7, val_error: 0.97, auc: 0.0000  ✗ AUC接近0
+```
+
+**原因**: Instance-level 聚类正确地将 patch 分成了两类，但 bag-level 分类器的权重方向反了（cluster 0 对应 class 1，cluster 1 对应 class 0）
+
+**解决方案**:
+
+| 方案 | 命令 | 说明 |
+|------|------|------|
+| MIL 模型 | `--model_type mil` | 无聚类，纯 bag-level 分类 |
+| 关闭聚类 | `--bag_weight 1.0 --no_inst_cluster` | 只用 bag loss |
+| **自动修正（推荐）** | `--auto_fix_inversion` (eval.py) | 检测到反转时自动翻转预测 |
+| 手动翻转 | AUC≈0 时输出 1-AUC | 临时方案 |
+
+**自动修正用法**:
+```bash
+python eval.py --auto_fix_inversion ... --save_exp_code eval_fixed
+```
+
+### 2. 严重过拟合
+
+**现象**: 训练误差接近 0，但验证误差 > 0.3
+
+```
+Train Error: 0.0000  ✓ 完美
+Val Error: 0.2833~0.7051  ✗ 很差
+```
+
+**原因**: 数据量太小（nanchang 只有 50 患者），模型容量过大
+
+**解决方案**:
+
+| 方案 | 参数调整 |
+|------|---------|
+| 增大 dropout | `--drop_out 0.5` |
+| 增大权重衰减 | `--reg 1e-3` |
+| 减小模型 | `--model_size small` |
+| 使用 MIL 基线 | `--model_type mil` |
+
+### 3. 结果不稳定（方差大）
+
+**现象**: 不同 fold 的 AUC 差异巨大（0.1~0.98）
+
+**原因**: 每 fold 测试集太小（~30 切片）
+
+**解决方案**:
+- 使用更大数据集
+- 多试几个 random seed
+- 用 merge 的 all 数据集（221 患者）
+
+### 训练过程分析命令
+
+```bash
+# 分析 TensorBoard 日志
+python3 << 'EOF'
+from tensorboard.backend.event_processing import event_accumulator
+import numpy as np
+
+def analyze_fold(log_dir, fold=0):
+    ea = event_accumulator.EventAccumulator(f"{log_dir}/{fold}/")
+    ea.Reload()
+    
+    val_auc = [e.value for e in ea.Scalars('val/auc')]
+    train_error = [e.value for e in ea.Scalars('train/error')]
+    val_error = [e.value for e in ea.Scalars('val/error')]
+    
+    print(f"Fold {fold}:")
+    print(f"  Val AUC: max={max(val_auc):.4f}, final={val_auc[-1]:.4f}")
+    print(f"  Train Error: {train_error[-1]:.4f}")
+    print(f"  Val Error: {val_error[-1]:.4f}")
+    
+    if max(val_auc) > 0.7 and val_auc[-1] < 0.3:
+        print(f"  ⚠️ 过拟合 + 聚类反转")
+    elif max(val_auc) < 0.3:
+        print(f"  ⚠️ 聚类反转")
+
+analyze_fold('results/dlbcl_all_uni_clam_sb_s1', 0)
+EOF
+```
 
 ### 评估
 ```bash
@@ -170,30 +270,30 @@ python extract_features_fp.py \
 |------|---------|------|-----------|-----|------|----------|
 | `task_1_tumor_vs_normal` | tumor_vs_normal_dummy_clean.csv | tumor, normal | - | - | - | - |
 | `task_2_tumor_subtyping` | tumor_subtyping_dummy_clean.csv | 3亚型 | - | - | - | - |
-| `task_3_dlbcl_coo` (nanchang) | nanchang_dlbcl.csv | GCB, non-GCB | 389/50 | ✓ | ✓ | features/nanchang_resnet_features/ |
-| `task_3_dlbcl_coo` (tcga) | tcga_dlbcl.csv | GCB, non-GCB | 39/39 | ✓ | ✓ | features/tcga_resnet_features/ |
-| `task_3_dlbcl_coo` (morph) | dlbcl_morph.csv | GCB, non-GCB | 185/133 | ✓ | 待提取 | features/morph_resnet_features/ |
-| `task_3_dlbcl_coo` (all) | dlbcl_all.csv | GCB, non-GCB | 613/222 | ✓ | 待创建 | features/all_resnet_features/ |
+| `task_3_dlbcl_coo` (nanchang) | nanchang_dlbcl.csv | GCB, non-GCB | 389/50 | ✓ | ✓ ResNet+UNI | features/nanchang_{resnet,uni}_features/ |
+| `task_3_dlbcl_coo` (tcga) | tcga_dlbcl.csv | GCB, non-GCB | 39/39 | ✓ | ✓ ResNet+UNI | features/tcga_{resnet,uni}_features/ |
+| `task_3_dlbcl_coo` (morph) | dlbcl_morph.csv | GCB, non-GCB | 183/132 | ✓ | ✓ ResNet+UNI | features/morph_{resnet,uni}_features/ |
+| `task_3_dlbcl_coo` (all) | dlbcl_all.csv | GCB, non-GCB | 611/221 | ✓ | ✓ | features/all_{resnet,uni}_features/ |
 
-> 注：三个DLBCL数据集共用 `task_3_dlbcl_coo`，通过 `--data_root_dir` 区分特征目录。
+> 注：三个DLBCL数据集共用 `task_3_dlbcl_coo`，通过 `--dataset` 和 `--feature_type` 区分。
 
 ### DLBCL 数据集详情
 
 #### 1. nanchang_dlbcl (南昌DLBCL)
 - 来源: 南昌大学附属医院
 - WSI格式: `.sdpc`
-- 特征状态: 已提取 (389个pt文件)
+- 特征状态: ResNet+UNI 均已提取 (389个pt文件)
 
 #### 2. tcga_dlbcl (TCGA DLBCL)
 - 来源: TCGA数据库
 - WSI格式: `.svs`
-- 特征状态: 已提取 (39个pt文件)
+- 特征状态: ResNet+UNI 均已提取 (39个pt文件)
 - 已清理: 5个无label的WSI
 
 #### 3. dlbcl_morph (DLBCL Morphology)
 - 来源: 临床IHC数据，Hans算法推导
 - WSI格式: `.svs`
-- 特征状态: 需提取 (185个WSI)
+- 特征状态: ResNet+UNI 均已提取 (183个pt文件)
 - Hans算法: 基于CD10、BCL6、MUM1推导GCB/non-GCB
 - 已清理: 16个无IHC数据的患者
 
@@ -221,32 +321,32 @@ python extract_features_fp.py \
 
 ### 分开训练多个数据集
 
-三个DLBCL数据集共用 `task_3_dlbcl_coo`，通过 `--data_root_dir` 区分：
+三个DLBCL数据集共用 `task_3_dlbcl_coo`，通过 `--dataset` 参数区分：
 
 ```bash
+# 生成各数据集独立的 splits（会自动创建 dataset-specific 目录）
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset nanchang --seed 1 --k 10
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset tcga --seed 1 --k 10
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset morph --seed 1 --k 10
+
+# 训练时会自动根据 --dataset 查找对应的 splits 目录
 # nanchang_dlbcl
-python main.py --task task_3_dlbcl_coo \
-  --exp_code nanchang_clam_sb \
-  --data_root_dir features/dlbcl_resnet_features \
-  --results_dir results/nanchang ...
+python main.py --task task_3_dlbcl_coo --dataset nanchang \
+  --exp_code nanchang_clam_sb --data_root_dir features --results_dir results ...
 
 # tcga_dlbcl
-python main.py --task task_3_dlbcl_coo \
-  --exp_code tcga_clam_sb \
-  --data_root_dir features/TCGA-DLBC \
-  --results_dir results/tcga ...
+python main.py --task task_3_dlbcl_coo --dataset tcga \
+  --exp_code tcga_clam_sb --data_root_dir features --results_dir results ...
 
-# dlbcl_morph (需先提取特征)
-python main.py --task task_3_dlbcl_coo \
-  --exp_code morph_clam_sb \
-  --data_root_dir features/dlbcl_morph \
-  --results_dir results/morph ...
+# dlbcl_morph
+python main.py --task task_3_dlbcl_coo --dataset morph \
+  --exp_code morph_clam_sb --data_root_dir features --results_dir results ...
 ```
 
 关键点：
-- `--exp_code` 用于区分不同实验
-- `--results_dir` 用于区分不同数据集的输出
-- `--data_root_dir` 指向对应数据集的特征目录
+- `--dataset` 参数会同时影响 CSV 选择、特征目录查找和 splits 目录定位
+- splits 目录格式：`splits/task_3_dlbcl_coo_<dataset>_100`（如 `splits/task_3_dlbcl_coo_nanchang_100`）
+- `main.py` 已自动根据 `--dataset` 推断 split_dir，无需手动指定
 
 ## 数据集目录结构
 

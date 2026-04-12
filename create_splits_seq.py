@@ -97,7 +97,9 @@ if __name__ == '__main__':
     
     for lf in label_fracs:
         # 每个 label_frac 对应独立的输出目录
-        split_dir = 'splits/'+ str(args.task) + '_{}'.format(int(lf * 100))
+        # 对于 task_3_dlbcl_coo，会按 dataset 生成独立目录（如 task_3_dlbcl_coo_nanchang_100）
+        dataset_name = getattr(args, 'dataset', 'default')
+        split_dir = 'splits/'+ str(args.task) + '_' + dataset_name + '_{}'.format(int(lf * 100))
         os.makedirs(split_dir, exist_ok=True)
         dataset.create_splits(k = args.k, val_num = val_num, test_num = test_num, label_frac=lf)
         for i in range(args.k):

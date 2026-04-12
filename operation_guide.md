@@ -428,22 +428,80 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
     --embed_dim 1024
 ```
 
-##### 4.4.3 标准 MIL 基线
+##### 4.4.6 标准 MIL 基线
 
 ```bash
-# MIL 基线模型
+# MIL 基线模型（无注意力，无instance clustering，最简单的MIL）
 CUDA_VISIBLE_DEVICES=0 python main.py \
     --task task_3_dlbcl_coo \
-    --data_root_dir /home/shanyiye/CLAM/features \
-    --results_dir /home/shanyiye/CLAM/results \
-    --exp_code dlbcl_gcb_nongcb_mil \
+    --dataset nanchang \
+    --feature_type uni \
+    --data_root_dir features \
+    --results_dir results \
+    --exp_code nanchang_uni_mil \
     --model_type mil \
-    --model_size small \
     --drop_out 0.25 \
     --early_stopping \
     --lr 2e-4 \
     --k 10 \
     --bag_loss ce \
+    --weighted_sample \
+    --log_data \
+    --embed_dim 1024
+```
+
+##### 4.4.4 CLAM + 强正则化 + 无 Instance Clustering
+
+```bash
+# CLAM_SB + 强正则化 + 关闭 instance-level 聚类
+# 适用于：小数据集、解决聚类反转、减少过拟合
+CUDA_VISIBLE_DEVICES=0 python main.py \
+    --task task_3_dlbcl_coo \
+    --dataset nanchang \
+    --feature_type uni \
+    --data_root_dir features \
+    --results_dir results \
+    --exp_code nanchang_uni_clam_sb_reg \
+    --model_type clam_sb \
+    --drop_out 0.5 \
+    --reg 1e-3 \
+    --early_stopping \
+    --lr 2e-4 \
+    --k 10 \
+    --bag_loss ce \
+    --bag_weight 1.0 \
+    --weighted_sample \
+    --log_data \
+    --embed_dim 1024
+```
+
+评估命令（启用聚类反转修正）:
+```bash
+python eval.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --models_exp_code nanchang_uni_clam_sb_reg_s1 --save_exp_code nanchang_uni_clam_sb_reg_eval \
+    --model_type clam_sb --auto_fix_inversion --data_root_dir features
+```
+
+##### 4.4.5 CLAM 纯 Bag-Level（无 Instance Clustering）
+
+```bash
+# CLAM_SB 只用 bag loss，关闭 instance-level 聚类
+# 适用于调试聚类方向反转问题
+CUDA_VISIBLE_DEVICES=0 python main.py \
+    --task task_3_dlbcl_coo \
+    --dataset nanchang \
+    --feature_type uni \
+    --data_root_dir features \
+    --results_dir results \
+    --exp_code nanchang_uni_clam_sb_nocluster \
+    --model_type clam_sb \
+    --drop_out 0.25 \
+    --early_stopping \
+    --lr 2e-4 \
+    --k 10 \
+    --bag_loss ce \
+    --bag_weight 1.0 \
+    --weighted_sample \
     --log_data \
     --embed_dim 1024
 ```
@@ -1000,6 +1058,7 @@ python eval.py --models_exp_code exp_001_s1 --save_exp_code exp_001_eval --task 
 3. **早停机制**: 建议启用 `--early_stopping`，防止过拟合
 4. **SDPC 格式**: 使用 `--slide_ext .sdpc` 参数
 5. **少样本学习**: 调整 `--label_frac` 参数（如 0.25 表示只用 25% 的标签训练）
+6. **CLAM 聚类反转问题**: 如果训练时 instance clustering 准确率接近 100% 但验证时 AUC 接近 0，可能是聚类方向反转（cluster 0 对应 class 1）。解决方案：使用 `--bag_weight 1.0 --no_inst_cluster` 或换用 `mil` 模型
 
 ---
 
@@ -1058,87 +1117,39 @@ python extract_features_fp.py --data_h5_dir results/dlbcl_morph/ --data_slide_di
 #### 8.3.1 创建数据划分
 
 ```bash
-# 为各数据集创建数据划分（使用不同seed确保独立性）
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 1 --k 10  # nanchang
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 2 --k 10  # tcga
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 3 --k 10  # morph
+# 为各数据集创建数据划分（会按 dataset 生成独立目录）
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset nanchang --seed 1 --k 10
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset tcga --seed 1 --k 10
+python create_splits_seq.py --task task_3_dlbcl_coo --dataset morph --seed 1 --k 10
+
+# splits 目录格式：splits/task_3_dlbcl_coo_<dataset>_100
+# 例如：splits/task_3_dlbcl_coo_nanchang_100, splits/task_3_dlbcl_coo_tcga_100
 ```
 
-```python
-# 在 argument 中添加：
-parser.add_argument('--dataset', type=str, default='nanchang',
-                    choices=['nanchang', 'tcga', 'morph'],
-                    help='选择数据集')
+#### 8.3.2 使用不同数据集训练
 
-# 修改 task_3_dlbcl_coo 分支：
-elif args.task == 'task_3_dlbcl_coo':
-    args.n_classes = 2
-    # 根据 --dataset 参数选择CSV和特征目录
-    if args.dataset == 'nanchang':
-        csv_path = 'dataset_csv/nanchang_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'nanchang_resnet_features')
-    elif args.dataset == 'tcga':
-        csv_path = 'dataset_csv/tcga_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'tcga_resnet_features')
-    elif args.dataset == 'morph':
-        csv_path = 'dataset_csv/dlbcl_morph.csv'
-        data_dir = os.path.join(args.data_root_dir, 'morph_resnet_features')
-
-    dataset = Generic_MIL_Dataset(
-        csv_path=csv_path,
-        data_dir=data_dir,
-        shuffle=False,
-        seed=args.seed,
-        print_info=True,
-        label_dict={'GCB': 0, 'non-GCB': 1},
-        patient_strat=True,
-        ignore=[]
-    )
-```
-
-#### 8.3.2 创建各数据集的数据划分
+> main.py 已自动根据 `--dataset` 参数推断 split_dir，无需手动指定
 
 ```bash
-# 方法1: 使用 --split_dir 指定不同的划分目录
-# 先创建默认划分（基于 nanchang）
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 1 --label_frac 1 --k 10
-
-# 复制为各数据集的划分（需要根据各数据集的slide重新生成）
-# 由于create_splits_seq.py使用固定的CSV，需要手动或修改代码
-
-# 方法2: 使用不同seed创建多套划分（简单方案）
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 1 --k 10  # nanchang用
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 2 --k 10  # tcga用
-python create_splits_seq.py --task task_3_dlbcl_coo --seed 3 --k 10  # morph用
-
-# 然后通过 --split_dir 指定
-# nanchang: splits/task_3_dlbcl_coo_100 (seed=1)
-# tcga: splits/task_3_dlbcl_coo_100 (seed=2)
-# morph: splits/task_3_dlbcl_coo_100 (seed=3)
-```
-
-#### 8.3.3 使用不同数据集训练
-
-```bash
-# 训练 nanchang_dlbcl
-python main.py --task task_3_dlbcl_coo --dataset nanchang \
+# 训练 nanchang_dlbcl (UNI特征)
+python main.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
     --data_root_dir features \
-    --exp_code nanchang_clam_sb \
-    --split_dir splits/task_3_dlbcl_coo_100 \
-    ...
+    --exp_code nanchang_uni_clam_sb \
+    --results_dir results \
+    ...  # 无需指定 --split_dir，会自动查找 splits/task_3_dlbcl_coo_nanchang_100
 
 # 训练 tcga_dlbcl
-python main.py --task task_3_dlbcl_coo --dataset tcga \
+python main.py --task task_3_dlbcl_coo --dataset tcga --feature_type uni \
     --data_root_dir features \
     --exp_code tcga_clam_sb \
-    --split_dir splits/task_3_dlbcl_coo_100 \
-    ...
+    --results_dir results \
+    ...  # 自动查找 splits/task_3_dlbcl_coo_tcga_100
 
 # 训练 dlbcl_morph
-python main.py --task task_3_dlbcl_coo --dataset morph \
+python main.py --task task_3_dlbcl_coo --dataset morph --feature_type uni \
     --data_root_dir features \
     --exp_code morph_clam_sb \
-    --split_dir splits/task_3_dlbcl_coo_100 \
+    --results_dir results \
     ...
 ```
 
@@ -1247,29 +1258,36 @@ print(f'GCB: {(df[\"label\"]==\"GCB\").sum()}, non-GCB: {(df[\"label\"]==\"non-G
 #### 8.5.2 合并特征
 
 ```bash
-# 复制特征文件到统一目录
-mkdir -p features/all_resnet_features
-cp features/nanchang_resnet_features/pt_files/* features/all_resnet_features/
-cp features/tcga_resnet_features/pt_files/* features/all_resnet_features/
-# morph的特征（提取后）
-cp features/morph_resnet_features/pt_files/* features/all_resnet_features/
+# 合并 ResNet 特征
+mkdir -p features/all_resnet_features/pt_files
+cp features/nanchang_resnet_features/pt_files/* features/all_resnet_features/pt_files/
+cp features/tcga_resnet_features/pt_files/* features/all_resnet_features/pt_files/
+cp features/morph_resnet_features/pt_files/* features/all_resnet_features/pt_files/
+
+# 合并 UNI 特征（符号链接避免复制）
+mkdir -p features/all_uni_features/pt_files
+ln -sf features/nanchang_uni_features/pt_files/* features/all_uni_features/pt_files/
+ln -sf features/tcga_uni_features/pt_files/* features/all_uni_features/pt_files/
+ln -sf features/morph_uni_features/pt_files/* features/all_uni_features/pt_files/
 ```
 
 #### 8.5.3 创建数据划分并训练
 
 ```bash
-# 创建数据划分（需要修改main.py支持新CSV，或直接用合并后的CSV）
-# 训练合并后的数据集
+# 创建数据划分
+python create_splits_seq.py --task task_3_dlbcl_coo --seed 1 --k 10
+
+# 训练合并后的数据集 (ResNet)
 CUDA_VISIBLE_DEVICES=0 python main.py \
-    --task task_3_dlbcl_coo \
-    --dataset all \
-    --data_root_dir features \
-    --exp_code all_clam_sb \
-    --results_dir results/dlbcl_all \
-    --exp_code dlbcl_all_clam_sb \
-    --model_type clam_sb \
-    --k 10 \
-    ...
+    --task task_3_dlbcl_coo --dataset all --feature_type resnet \
+    --data_root_dir features --results_dir results/dlbcl_all \
+    --exp_code dlbcl_all_resnet_clam_sb --model_type clam_sb --k 10 ...
+
+# 训练合并后的数据集 (UNI)
+CUDA_VISIBLE_DEVICES=0 python main.py \
+    --task task_3_dlbcl_coo --dataset all --feature_type uni \
+    --data_root_dir features --results_dir results/dlbcl_all \
+    --exp_code dlbcl_all_uni_clam_sb --model_type clam_sb --k 10 ...
 ```
 
 ### 8.6 评估
@@ -1277,14 +1295,30 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 分别评估三个数据集：
 
 ```bash
-# nanchang
-python eval.py --models_exp_code nanchang_clam_sb_s1 --save_exp_code nanchang_eval --task task_3_dlbcl_coo --model_type clam_sb --data_root_dir features/dlbcl_resnet_features
+# nanchang (ResNet)
+python eval.py --task task_3_dlbcl_coo --dataset nanchang --feature_type resnet \
+    --models_exp_code nanchang_clam_sb_s1 --save_exp_code nanchang_resnet_eval \
+    --model_type clam_sb --data_root_dir features
 
-# tcga
-python eval.py --models_exp_code tcga_clam_sb_s1 --save_exp_code tcga_eval --task task_3_dlbcl_coo --model_type clam_sb --data_root_dir features/TCGA-DLBC
+# nanchang (UNI) - CLAM_SB
+python eval.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --models_exp_code nanchang_uni_clam_sb_s1 --save_exp_code nanchang_uni_clam_sb_eval \
+    --model_type clam_sb --data_root_dir features
 
-# morph
-python eval.py --models_exp_code morph_clam_sb_s1 --save_exp_code morph_eval --task task_3_dlbcl_coo --model_type clam_sb --data_root_dir features/dlbcl_morph
+# nanchang (UNI) - MIL 基线
+python eval.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --models_exp_code nanchang_uni_mil_s1 --save_exp_code nanchang_uni_mil_eval \
+    --model_type mil --data_root_dir features
+
+# nanchang (UNI) - CLAM 无聚类
+python eval.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --models_exp_code nanchang_uni_clam_sb_nocluster_s1 --save_exp_code nanchang_uni_clam_sb_nocluster_eval \
+    --model_type clam_sb --data_root_dir features
+
+# 合并数据集评估 (UNI)
+python eval.py --task task_3_dlbcl_coo --dataset all --feature_type uni \
+    --models_exp_code dlbcl_all_uni_clam_sb_s1 --save_exp_code dlbcl_all_uni_eval \
+    --model_type clam_sb --data_root_dir features
 ```
 
 ### 8.7 并行训练

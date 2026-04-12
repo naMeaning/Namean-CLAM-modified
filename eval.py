@@ -62,9 +62,14 @@ parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'tas
 parser.add_argument('--dataset', type=str, default='nanchang',
                     choices=['nanchang', 'tcga', 'morph', 'all'],
                     help='选择DLBCL数据集 (仅task_3_dlbcl_coo有效)')
+parser.add_argument('--feature_type', type=str, default='resnet',
+                    choices=['resnet', 'uni'],
+                    help='选择特征类型: resnet 或 uni')
 parser.add_argument('--drop_out', type=float, default=0.25, help='dropout')
 parser.add_argument('--embed_dim', type=int, default=1024)
 parser.add_argument('--seed', type=int, default=1, help='random seed')
+parser.add_argument('--auto_fix_inversion', action='store_true', default=False,
+                    help='自动检测并修正聚类反转问题 (CLAM特有问题)')
 
 args = parser.parse_args()
 
@@ -120,19 +125,19 @@ elif args.task == 'task_2_tumor_subtyping':
                             ignore=[])
 elif args.task == 'task_3_dlbcl_coo':
     args.n_classes = 2
-    # 根据 --dataset 参数选择CSV和特征目录
+    # 根据 --dataset 和 --feature_type 参数选择CSV和特征目录
     if args.dataset == 'nanchang':
         csv_path = 'dataset_csv/nanchang_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'nanchang_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'nanchang_{}_features'.format(args.feature_type))
     elif args.dataset == 'tcga':
         csv_path = 'dataset_csv/tcga_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'tcga_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'tcga_{}_features'.format(args.feature_type))
     elif args.dataset == 'morph':
         csv_path = 'dataset_csv/dlbcl_morph.csv'
-        data_dir = os.path.join(args.data_root_dir, 'morph_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'morph_{}_features'.format(args.feature_type))
     elif args.dataset == 'all':
         csv_path = 'dataset_csv/dlbcl_all.csv'
-        data_dir = os.path.join(args.data_root_dir, 'all_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'all_{}_features'.format(args.feature_type))
 
     dataset = Generic_MIL_Dataset(
         csv_path=csv_path,

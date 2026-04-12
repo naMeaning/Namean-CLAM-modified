@@ -131,6 +131,9 @@ parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'tas
 parser.add_argument('--dataset', type=str, default='nanchang',
                     choices=['nanchang', 'tcga', 'morph', 'all'],
                     help='选择DLBCL数据集 (仅task_3_dlbcl_coo有效)')
+parser.add_argument('--feature_type', type=str, default='resnet',
+                    choices=['resnet', 'uni'],
+                    help='选择特征类型: resnet 或 uni')
 
 ### CLAM specific options
 # CLAM 专用参数：实例级聚类损失配置
@@ -230,16 +233,17 @@ elif args.task == 'task_3_dlbcl_coo':
     # 根据 --dataset 参数选择CSV和特征目录
     if args.dataset == 'nanchang':
         csv_path = 'dataset_csv/nanchang_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'nanchang_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'nanchang_{}_features'.format(args.feature_type))
     elif args.dataset == 'tcga':
         csv_path = 'dataset_csv/tcga_dlbcl.csv'
-        data_dir = os.path.join(args.data_root_dir, 'tcga_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'tcga_{}_features'.format(args.feature_type))
     elif args.dataset == 'morph':
         csv_path = 'dataset_csv/dlbcl_morph.csv'
-        data_dir = os.path.join(args.data_root_dir, 'morph_resnet_features')
+        data_dir = os.path.join(args.data_root_dir, 'morph_{}_features'.format(args.feature_type))
     elif args.dataset == 'all':
         csv_path = 'dataset_csv/dlbcl_all.csv'
-        data_dir = os.path.join(args.data_root_dir, 'all_resnet_features')
+        feat_suffix = 'all_{}_features'.format(args.feature_type)
+        data_dir = os.path.join(args.data_root_dir, feat_suffix)
 
     dataset = Generic_MIL_Dataset(
         csv_path=csv_path,
@@ -263,9 +267,13 @@ args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + '_s{}'.fo
 if not os.path.isdir(args.results_dir):
     os.mkdir(args.results_dir)
 
-# 推断数据划分目录（splits/<task>_<label_frac*100>）
+# 推断数据划分目录（splits/<task>_<dataset>_<label_frac*100>）
+# task_3_dlbcl_coo 会根据 --dataset 参数自动查找对应目录
 if args.split_dir is None:
-    args.split_dir = os.path.join('splits', args.task+'_{}'.format(int(args.label_frac*100)))
+    if args.task == 'task_3_dlbcl_coo' and hasattr(args, 'dataset'):
+        args.split_dir = os.path.join('splits', args.task+'_'+args.dataset+'_{}'.format(int(args.label_frac*100)))
+    else:
+        args.split_dir = os.path.join('splits', args.task+'_{}'.format(int(args.label_frac*100)))
 else:
     args.split_dir = os.path.join('splits', args.split_dir)
 

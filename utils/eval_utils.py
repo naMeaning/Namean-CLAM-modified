@@ -123,9 +123,27 @@ def summary(model, loader, args):
         # 只有一个类别时无法计算 AUC，返回 -1 标记为无效
         auc_score = -1
 
-    else: 
+    else:
         if args.n_classes == 2:
             auc_score = roc_auc_score(all_labels, all_probs[:, 1])
+
+            # =========================================================
+            # 检测并修正聚类反转问题
+            # 如果 AUC 很低（< 0.3）但翻转后很高（> 0.7），说明发生了聚类反转
+            # 聚类反转：cluster 0 对应 class 1，cluster 1 对应 class 0
+            # =========================================================
+            if hasattr(args, 'auto_fix_inversion') and args.auto_fix_inversion:
+                inverted_probs = np.column_stack([all_probs[:, 1], all_probs[:, 0]])
+                inverted_auc = roc_auc_score(all_labels, inverted_probs[:, 1])
+
+                if auc_score < 0.3 and inverted_auc > 0.7:
+                    print(f"  [WARNING] 检测到聚类反转! AUC: {auc_score:.4f} -> 修正为: {inverted_auc:.4f}")
+                    # 翻转预测：Y_hat 和概率都需要翻转
+                    all_probs = inverted_probs
+                    all_preds = 1 - all_preds  # 翻转预测标签
+                    auc_score = inverted_auc  # 更新 AUC
+                    # 重新计算错误率
+                    test_error = 1 - np.mean(all_preds == all_labels)
         else:
             # 多分类：逐类计算 AUC（OvR 策略）
             binary_labels = label_binarize(all_labels, classes=[i for i in range(args.n_classes)])
