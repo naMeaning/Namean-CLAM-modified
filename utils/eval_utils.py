@@ -31,8 +31,10 @@ def initiate_model(args, ckpt_path, device='cuda'):
     以确保 strict=True 的 load_state_dict 能够正常运行。
     同时将 '.module' 前缀去除（应对 DataParallel 保存的权重）。
     """
-    print('Init Model')    
-    model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes, "embed_dim": args.embed_dim}
+    print('Init Model')
+    # 当启用 PCA 时，使用 PCA 降维后的维度作为模型的 embed_dim
+    model_embed_dim = args.pca_dim if getattr(args, 'use_pca', False) else args.embed_dim
+    model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes, "embed_dim": model_embed_dim}
     
     if args.model_size is not None and args.model_type in ['clam_sb', 'clam_mb']:
         model_dict.update({"size_arg": args.model_size})

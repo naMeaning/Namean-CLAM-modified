@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset, save_splits
 import h5py
 from utils.eval_utils import *
+from utils.file_utils import load_pkl
 
 # =============================================================================
 # 命令行参数解析
@@ -67,9 +68,15 @@ parser.add_argument('--feature_type', type=str, default='resnet',
                     help='选择特征类型: resnet 或 uni')
 parser.add_argument('--drop_out', type=float, default=0.25, help='dropout')
 parser.add_argument('--embed_dim', type=int, default=1024)
+parser.add_argument('--use_pca', action='store_true', default=False,
+                    help='Enable PCA dimensionality reduction (must match training)')
+parser.add_argument('--pca_dim', type=int, default=256,
+                    help='PCA dimensions (must match training)')
 parser.add_argument('--seed', type=int, default=1, help='random seed')
 parser.add_argument('--auto_fix_inversion', action='store_true', default=False,
                     help='自动检测并修正聚类反转问题 (CLAM特有问题)')
+parser.add_argument('--ckpt_type', type=str, choices=['default', 'auc', 'loss'], default='default',
+                    help='checkpoint类型: default(标准), auc(best_val_auc), loss(best_val_loss)')
 
 args = parser.parse_args()
 
@@ -95,7 +102,9 @@ settings = {'task': args.task,
             'models_dir': args.models_dir,
             'model_type': args.model_type,
             'drop_out': args.drop_out,
-            'model_size': args.model_size}
+            'model_size': args.model_size,
+            'use_pca': args.use_pca,
+            'pca_dim': args.pca_dim}
 
 with open(args.save_dir + '/eval_experiment_{}.txt'.format(args.save_exp_code), 'w') as f:
     print(settings, file=f)
@@ -177,8 +186,18 @@ if args.fold == -1:
     folds = range(start, end)
 else:
     folds = range(args.fold, args.fold+1)
+
 # 构建每个 Fold 对应的 checkpoint 路径列表
-ckpt_paths = [os.path.join(args.models_dir, 's_{}_checkpoint.pt'.format(fold)) for fold in folds]
+# 根据 ckpt_type 选择不同类型的 checkpoint
+if args.ckpt_type == 'auc':
+    ckpt_paths = [os.path.join(args.models_dir, 's_{}_checkpoint_auc.pt'.format(fold)) for fold in folds]
+elif args.ckpt_type == 'loss':
+    ckpt_paths = [os.path.join(args.models_dir, 's_{}_checkpoint_loss.pt'.format(fold)) for fold in folds]
+else:  # default
+    ckpt_paths = [os.path.join(args.models_dir, 's_{}_checkpoint.pt'.format(fold)) for fold in folds]
+
+# 记录实际使用的 checkpoint 类型
+settings.update({'ckpt_type': args.ckpt_type})
 # 数据集 split 名称到 return_splits 返回值索引的映射（all=-1 表示使用整个数据集）
 datasets_id = {'train': 0, 'val': 1, 'test': 2, 'all': -1}
 
@@ -195,6 +214,18 @@ if __name__ == "__main__":
             csv_path = '{}/splits_{}.csv'.format(args.splits_dir, folds[ckpt_idx])
             datasets = dataset.return_splits(from_id=False, csv_path=csv_path)
             split_dataset = datasets[datasets_id[args.split]]
+
+        # PCA 实验的独立评估必须复用训练时同 fold 的 PCA 模型
+        if args.use_pca:
+            pca_path = os.path.join(args.models_dir, 's_{}_pca.pkl'.format(folds[ckpt_idx]))
+            if not os.path.isfile(pca_path):
+                raise FileNotFoundError(
+                    f"PCA model not found for fold {folds[ckpt_idx]}: {pca_path}. "
+                    "Please make sure training saved fold-specific PCA models."
+                )
+            split_dataset.pca_model = load_pkl(pca_path)
+            split_dataset.pca_dim = args.pca_dim
+
         model, patient_results, test_error, auc, df  = eval(split_dataset, args, ckpt_paths[ckpt_idx])
         all_results.append(all_results)
         all_auc.append(auc)
