@@ -43,11 +43,73 @@ python main.py --task task_3_dlbcl_coo --dataset nanchang --exp_code nanchang_cl
 - `--bag_weight`: Bag损失权重（1.0=只用bag loss，0.7=标准配置）
 - `--no_inst_cluster`: 关闭instance-level聚类
 - `--k`: 折数
+- `--monitor_metric`: 早停监控指标（`val_auc` 或 `val_loss`，默认 `val_auc`）
+- `--save_best_auc_ckpt`: 保存 best_auc 和 best_loss 两套 checkpoint
 
 ### 模型选择建议
 - `mil`: 最简单的MIL基线，适合调试和对比
 - `clam_sb` + `--bag_weight 1.0 --no_inst_cluster`: 纯bag-level分类，排除聚类干扰
 - `clam_sb`（标准）: 同时使用bag-level和instance-level损失
+
+### DLBCL 任务推荐配置
+
+DLBCL 数据集（task_3_dlbcl_coo）已内置更保守的默认参数：
+
+| 参数 | DLBCL默认 | 说明 |
+|------|-----------|------|
+| `drop_out` | 0.5 | 更高 dropout 减少过拟合 |
+| `reg` | 1e-3 | 更强权重衰减 |
+| `weighted_sample` | False | DLBCL类别接近平衡 |
+| `k` (nanchang) | 5 | 50例患者用5折更稳定 |
+| `monitor_metric` | val_auc | 按 AUC 选模型 |
+| `feature_noise_std` | 0.02 | 特征高斯噪声 |
+| `feature_dropout` | 0.1 | 特征维度 Dropout |
+| `patch_keep_ratio` | 0.8 | Patch 保留比例 |
+| `max_patches_per_bag` | 512 | 每 bag 最大 patch 数 |
+| `warmup_bag_only_epochs` | 10 | 前 N 轮只用 bag loss |
+| `attention_entropy_weight` | 1e-3 | Attention 熵正则 |
+| `label_smoothing` | 0.05 | 标签平滑 |
+| `lr` | 5e-5 | 学习率（配合 Cosine Annealing） |
+| `use_swa` | False | SWA 权重平均 |
+
+**评估时指定 checkpoint 类型**:
+```bash
+python eval.py --ckpt_type auc ...  # 使用 best_val_auc checkpoint
+python eval.py --ckpt_type loss ... # 使用 best_val_loss checkpoint
+```
+
+**DLBCL 标准训练命令（v3 版本，含 Cosine Annealing + SWA + PCA）**:
+```bash
+# Morph（132 患者，推荐 v3 配置）
+python main.py --task task_3_dlbcl_coo --dataset morph --feature_type uni \
+    --exp_code morph_uni_clam_sb_v3 --model_type clam_sb \
+    --use_pca --pca_dim 256 \
+    --warmup_bag_only_epochs 15 --attention_entropy_weight 0.005 \
+    --label_smoothing 0.1 --use_swa --swa_start_epoch 15 \
+    --early_stopping --monitor_metric val_auc
+
+# ALL（221 患者）
+python main.py --task task_3_dlbcl_coo --dataset all --feature_type uni \
+    --exp_code all_uni_clam_sb_v3 --model_type clam_sb \
+    --use_pca --pca_dim 384 \
+    --warmup_bag_only_epochs 10 --attention_entropy_weight 1e-3 \
+    --label_smoothing 0.05 --use_swa --swa_start_epoch 10 \
+    --model_size big \
+    --early_stopping --monitor_metric val_auc
+
+# Nanchang（50 患者）
+python main.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --exp_code nanchang_uni_clam_sb_v3 --model_type clam_sb \
+    --use_pca --pca_dim 256 \
+    --warmup_bag_only_epochs 20 --attention_entropy_weight 0.005 \
+    --label_smoothing 0.1 --use_swa --swa_start_epoch 20 \
+    --early_stopping --monitor_metric val_auc
+
+# 标准训练（自动使用上表所有推荐参数）
+python main.py --task task_3_dlbcl_coo --dataset nanchang --feature_type uni \
+    --exp_code nanchang_uni_clam_sb --model_type clam_sb \
+    --early_stopping --monitor_metric val_auc
+```
 
 ## 常见问题与解决方案
 
@@ -95,10 +157,18 @@ Val Error: 0.2833~0.7051  ✗ 很差
 
 | 方案 | 参数调整 |
 |------|---------|
+| 启用特征增强 | `--feature_noise_std 0.02 --feature_dropout 0.1` |
+| Patch Dropout | `--patch_keep_ratio 0.8 --max_patches_per_bag 512` |
 | 增大 dropout | `--drop_out 0.5` |
 | 增大权重衰减 | `--reg 1e-3` |
+| Warmup bag-only | `--warmup_bag_only_epochs 10` |
+| Attention 熵正则 | `--attention_entropy_weight 1e-3` |
+| 标签平滑 | `--label_smoothing 0.05` |
 | 减小模型 | `--model_size small` |
 | 使用 MIL 基线 | `--model_type mil` |
+| 关闭聚类 | `--bag_weight 1.0 --no_inst_cluster` |
+| SWA 权重平均 | `--use_swa --swa_start_epoch 10 --swa_lr 1e-5` |
+| Cosine LR | 内置（配合 lr=5e-5） |
 
 ### 3. 结果不稳定（方差大）
 
@@ -276,6 +346,8 @@ python extract_features_fp.py \
 | `task_3_dlbcl_coo` (all) | dlbcl_all.csv | GCB, non-GCB | 611/221 | ✓ | ✓ | features/all_{resnet,uni}_features/ |
 
 > 注：三个DLBCL数据集共用 `task_3_dlbcl_coo`，通过 `--dataset` 和 `--feature_type` 区分。
+>
+> `dlbcl_all.csv` 包含 `source` 列（tcga/nanchang/morph），用于 source-aware 数据划分，确保各折 source 分布均衡。
 
 ### DLBCL 数据集详情
 

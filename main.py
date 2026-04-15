@@ -51,6 +51,15 @@ def main(args):
     all_test_acc = []
     all_val_acc = []
     folds = np.arange(start, end)
+
+    # 构建特征增强配置（传递给 DataLoader）
+    args.aug_config = {
+        'feature_noise_std': args.feature_noise_std,
+        'feature_dropout': args.feature_dropout,
+        'patch_keep_ratio': args.patch_keep_ratio,
+        'max_patches_per_bag': args.max_patches_per_bag,
+    }
+
     for i in folds:
         seed_torch(args.seed)
         # 根据当前 Fold 的 CSV split 文件加载 train/val/test 数据集
@@ -141,11 +150,51 @@ parser.add_argument('--no_inst_cluster', action='store_true', default=False,
                      help='disable instance-level clustering')
 parser.add_argument('--inst_loss', type=str, choices=['svm', 'ce', None], default=None,
                      help='instance-level clustering loss function (default: None)')
-parser.add_argument('--subtyping', action='store_true', default=False, 
+parser.add_argument('--subtyping', action='store_true', default=False,
                      help='subtyping problem')
 parser.add_argument('--bag_weight', type=float, default=0.7,
                     help='clam: weight coefficient for bag-level loss (default: 0.7)')
 parser.add_argument('--B', type=int, default=8, help='numbr of positive/negative patches to sample for clam')
+
+# --- 特征增强参数 ---
+parser.add_argument('--feature_noise_std', type=float, default=0.0,
+                    help='Gaussian noise std for feature augmentation (default: 0.0, recommended: 0.02)')
+parser.add_argument('--feature_dropout', type=float, default=0.0,
+                    help='Feature dimension dropout probability (default: 0.0, recommended: 0.1)')
+parser.add_argument('--patch_keep_ratio', type=float, default=1.0,
+                    help='Ratio of patches to keep per bag during training (default: 1.0, recommended: 0.8)')
+parser.add_argument('--max_patches_per_bag', type=int, default=None,
+                    help='Maximum patches per bag (default: None, recommended: 512)')
+
+# --- PCA 降维参数 ---
+parser.add_argument('--use_pca', action='store_true', default=False,
+                    help='Enable PCA dimensionality reduction')
+parser.add_argument('--pca_dim', type=int, default=256,
+                    help='PCA dimensions (default: 256, nanchang=256, morph=384, all=512)')
+parser.add_argument('--pca_whiten', action='store_true', default=False,
+                    help='Whiten PCA transformation')
+
+# --- 训练策略参数 ---
+parser.add_argument('--warmup_bag_only_epochs', type=int, default=0,
+                    help='First N epochs use bag-loss only, no instance clustering (default: 0, recommended: 10)')
+parser.add_argument('--attention_entropy_weight', type=float, default=0.0,
+                    help='Attention entropy regularization weight (default: 0.0, recommended: 1e-3)')
+parser.add_argument('--label_smoothing', type=float, default=0.0,
+                    help='Label smoothing for cross entropy loss (default: 0.0, recommended: 0.05)')
+
+# --- SWA 参数 ---
+parser.add_argument('--use_swa', action='store_true', default=False,
+                    help='Enable Stochastic Weight Averaging')
+parser.add_argument('--swa_start_epoch', type=int, default=10,
+                    help='Start SWA from epoch N (default: 10)')
+parser.add_argument('--swa_lr', type=float, default=1e-5,
+                    help='SWA learning rate (default: 1e-5)')
+
+# --- 早停与模型选择参数 ---
+parser.add_argument('--monitor_metric', type=str, choices=['val_auc', 'val_loss'], default='val_auc',
+                    help='metric to monitor for early stopping (default: val_auc for DLBCL tasks)')
+parser.add_argument('--save_best_auc_ckpt', action='store_true', default=False,
+                    help='save both best_auc and best_loss checkpoints')
 args = parser.parse_args()
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -168,15 +217,51 @@ def seed_torch(seed=7):
 
 seed_torch(args.seed)
 
+# =============================================================================
+# DLBCL 任务默认参数调整（更保守的配置，减少过拟合）
+# =============================================================================
+if args.task == 'task_3_dlbcl_coo':
+    # DLBCL 任务使用更保守的默认参数
+    args.drop_out = 0.5  # 原默认值 0.25，更高的 dropout 减少过拟合
+    args.reg = 1e-3      # 原默认值 1e-5，更强的权重衰减
+    args.weighted_sample = False  # 原默认 True，但 DLBCL 数据类别接近平衡
+
+    # DLBCL 任务的特征增强默认参数（减少过拟合）
+    if args.feature_noise_std == 0.0:
+        args.feature_noise_std = 0.02
+    if args.feature_dropout == 0.0:
+        args.feature_dropout = 0.1
+    if args.patch_keep_ratio == 1.0:
+        args.patch_keep_ratio = 0.8
+    if args.max_patches_per_bag is None:
+        args.max_patches_per_bag = 512
+
+    # DLBCL 任务的训练策略默认参数
+    if args.warmup_bag_only_epochs == 0:
+        args.warmup_bag_only_epochs = 10
+    if args.attention_entropy_weight == 0.0:
+        args.attention_entropy_weight = 1e-3
+    if args.label_smoothing == 0.0:
+        args.label_smoothing = 0.05
+
+    # 学习率降低（配合 Cosine Annealing 效果更好）
+    if args.lr == 1e-4:  # 仅当使用默认学习率时降低
+        args.lr = 5e-5
+
+    # Nanchang 数据集只有 50 例患者，默认 5 折更稳定（原 10 折）
+    if args.dataset == 'nanchang' and args.k == 10:
+        args.k = 5
+        print(f"\n[INFO] Nanchang dataset (50 cases) using 5-fold CV for more stable evaluation")
+
 # 默认特征维度（ResNet-50 截断特征层输出维度）
 encoding_size = 1024
 # 将当前实验配置打包为字典，用于日志记录
-settings = {'num_splits': args.k, 
+settings = {'num_splits': args.k,
             'k_start': args.k_start,
             'k_end': args.k_end,
             'task': args.task,
-            'max_epochs': args.max_epochs, 
-            'results_dir': args.results_dir, 
+            'max_epochs': args.max_epochs,
+            'results_dir': args.results_dir,
             'lr': args.lr,
             'experiment': args.exp_code,
             'reg': args.reg,
@@ -187,7 +272,18 @@ settings = {'num_splits': args.k,
             'model_size': args.model_size,
             "use_drop_out": args.drop_out,
             'weighted_sample': args.weighted_sample,
-            'opt': args.opt}
+            'opt': args.opt,
+            'monitor_metric': args.monitor_metric,
+            'save_best_auc_ckpt': args.save_best_auc_ckpt,
+            'feature_noise_std': args.feature_noise_std,
+            'feature_dropout': args.feature_dropout,
+            'patch_keep_ratio': args.patch_keep_ratio,
+            'max_patches_per_bag': args.max_patches_per_bag,
+            'use_pca': args.use_pca,
+            'pca_dim': args.pca_dim,
+            'warmup_bag_only_epochs': args.warmup_bag_only_epochs,
+            'attention_entropy_weight': args.attention_entropy_weight,
+            'label_smoothing': args.label_smoothing}
 
 # CLAM 模型额外记录 bag_weight、实例损失函数类型和采样数 B
 if args.model_type in ['clam_sb', 'clam_mb']:

@@ -56,8 +56,8 @@ class Generic_WSI_Classification_Dataset(Dataset):
 	"""
 	def __init__(self,
 		csv_path = 'dataset_csv/ccrcc_clean.csv',
-		shuffle = False, 
-		seed = 7, 
+		shuffle = False,
+		seed = 7,
 		print_info = True,
 		label_dict = {},
 		filter_dict = {},
@@ -65,6 +65,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		patient_strat=False,
 		label_col = None,
 		patient_voting = 'max',
+		source_col = None,
 		):
 		"""
 		Args:
@@ -74,6 +75,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			print_info (boolean): Whether to print a summary of the dataset
 			label_dict (dict): Dictionary with key, value pairs for converting str labels to int
 			ignore (list): List containing class labels to ignore
+			source_col (string): Column name for source data (for source-aware stratification)
 		"""
 		self.label_dict = label_dict
 		self.num_classes = len(set(self.label_dict.values()))
@@ -85,6 +87,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		if not label_col:
 			label_col = 'label'
 		self.label_col = label_col
+		self.source_col = source_col  # Store source column for source-aware stratification
 
 		slide_data = pd.read_csv(csv_path)
 		slide_data = self.filter_df(slide_data, filter_dict)
@@ -105,7 +108,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 
 	def cls_ids_prep(self):
 		# store ids corresponding each class at the patient or case level
-		self.patient_cls_ids = [[] for i in range(self.num_classes)]		
+		self.patient_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):
 			self.patient_cls_ids[i] = np.where(self.patient_data['label'] == i)[0]
 
@@ -114,14 +117,34 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		for i in range(self.num_classes):
 			self.slide_cls_ids[i] = np.where(self.slide_data['label'] == i)[0]
 
+		# Source-aware stratification: if source_col is set, create source-aware cls_ids
+		if hasattr(self, 'source_col') and self.source_col is not None:
+			self.source_aware_cls_ids = [[] for _ in range(self.num_classes)]
+			for i in range(self.num_classes):
+				# For each class, create sub-groups by source
+				class_mask = self.patient_data['label'] == i
+				class_indices = np.where(class_mask)[0]
+				if 'source' in self.patient_data:
+					sources = self.patient_data['source'][class_indices]
+					unique_sources = np.unique(sources)
+					for source in unique_sources:
+						source_mask = sources == source
+						source_indices = class_indices[source_mask]
+						self.source_aware_cls_ids[i].append(source_indices)
+				else:
+					# Fallback: no source available, treat as single group
+					self.source_aware_cls_ids[i] = [class_indices]
+
 	def patient_data_prep(self, patient_voting='max'):
 		"""
 		从 slide_data 中聚合出患者级别的标签。
 		每个患者可能对应多个 slide，通过 patient_voting 策略合并为单一标签。
+		支持 source_col 参数，用于 source-aware 分层。
 		"""
 		patients = np.unique(np.array(self.slide_data['case_id'])) # get unique patients
 		patient_labels = []
-		
+		patient_sources = []
+
 		for p in patients:
 			locations = self.slide_data[self.slide_data['case_id'] == p].index.tolist()
 			assert len(locations) > 0
@@ -133,8 +156,20 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			else:
 				raise NotImplementedError
 			patient_labels.append(label)
-		
+
+			# Extract source if available
+			if hasattr(self, 'source_col') and self.source_col is not None:
+				if self.source_col in self.slide_data.columns:
+					source = self.slide_data.loc[locations[0], self.source_col]
+					patient_sources.append(source)
+				else:
+					patient_sources.append('unknown')
+			else:
+				patient_sources.append(None)
+
 		self.patient_data = {'case_id':patients, 'label':np.array(patient_labels)}
+		if patient_sources[0] is not None:
+			self.patient_data['source'] = np.array(patient_sources)
 
 	@staticmethod
 	def df_prep(data, label_dict, ignore, label_col):
@@ -183,10 +218,11 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		"""
 		调用 generate_split 生成器创建 K-Fold 数据划分。
 		根据 patient_strat 决定划分粒度（患者级 or slide 级）。
+		如果 source_aware_cls_ids 可用，则使用 source-aware 分层。
 		"""
 		settings = {
-					'n_splits' : k, 
-					'val_num' : val_num, 
+					'n_splits' : k,
+					'val_num' : val_num,
 					'test_num': test_num,
 					'label_frac': label_frac,
 					'seed': self.seed,
@@ -194,7 +230,15 @@ class Generic_WSI_Classification_Dataset(Dataset):
 					}
 
 		if self.patient_strat:
-			settings.update({'cls_ids' : self.patient_cls_ids, 'samples': len(self.patient_data['case_id'])})
+			# Use source-aware stratification if available
+			if hasattr(self, 'source_aware_cls_ids') and self.source_aware_cls_ids is not None:
+				settings.update({
+					'cls_ids': self.source_aware_cls_ids,
+					'samples': len(self.patient_data['case_id']),
+					'source_aware': True
+				})
+			else:
+				settings.update({'cls_ids' : self.patient_cls_ids, 'samples': len(self.patient_data['case_id'])})
 		else:
 			settings.update({'cls_ids' : self.slide_cls_ids, 'samples': len(self.slide_data)})
 
@@ -403,8 +447,21 @@ class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 				# 加载 .pt 特征文件（仅特征，无坐标）
 				full_path = os.path.join(data_dir, 'pt_files', '{}.pt'.format(slide_id))
 				features = torch.load(full_path)
+
+				# PCA 变换（验证/测试同样应用，保证一致性）
+				if hasattr(self, 'pca_model') and self.pca_model is not None:
+					from utils.pca_utils import apply_pca_transform
+					features = apply_pca_transform(features, self.pca_model,
+					                               n_components=getattr(self, 'pca_dim', None))
+
+				# 训练时增强（验证/测试不做随机增强）
+				if hasattr(self, 'aug_config') and self.aug_config:
+					from utils.feature_aug import apply_feature_augmentation
+					features = apply_feature_augmentation(features, self.aug_config,
+					                                      training=getattr(self, 'training', False))
+
 				return features, label
-			
+
 			else:
 				return slide_id, label
 
@@ -426,11 +483,16 @@ class Generic_Split(Generic_MIL_Dataset):
 	不执行父类的完整初始化流程（无需重新读 CSV、无需 patient_data_prep）。
 	用于 train/val/test DataLoader 的直接数据源。
 	"""
-	def __init__(self, slide_data, data_dir=None, num_classes=2):
+	def __init__(self, slide_data, data_dir=None, num_classes=2,
+	             aug_config=None, training=False, pca_model=None, pca_dim=None):
 		self.use_h5 = False
 		self.slide_data = slide_data
 		self.data_dir = data_dir
 		self.num_classes = num_classes
+		self.aug_config = aug_config
+		self.training = training
+		self.pca_model = pca_model
+		self.pca_dim = pca_dim
 		# 直接构建 slide 级别的类别 ID 索引
 		self.slide_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):

@@ -59,6 +59,7 @@ elif args.task == 'task_3_dlbcl_coo':
     args.n_classes = 2
     # 根据 --dataset 参数选择CSV（支持 nanchang/tcga/morph/all）
     csv_path = 'dataset_csv/nanchang_dlbcl.csv'  # 默认
+    source_col = None  # 默认不使用 source-aware split
     if hasattr(args, 'dataset') and args.dataset:
         if args.dataset == 'nanchang':
             csv_path = 'dataset_csv/nanchang_dlbcl.csv'
@@ -68,6 +69,7 @@ elif args.task == 'task_3_dlbcl_coo':
             csv_path = 'dataset_csv/dlbcl_morph.csv'
         elif args.dataset == 'all':
             csv_path = 'dataset_csv/dlbcl_all.csv'
+            source_col = 'source'  # all 数据集启用 source-aware split
     dataset = Generic_WSI_Classification_Dataset(
         csv_path=csv_path,
         shuffle=False,
@@ -75,7 +77,8 @@ elif args.task == 'task_3_dlbcl_coo':
         print_info=True,
         label_dict={'GCB': 0, 'non-GCB': 1},
         patient_strat=True,
-        ignore=[]
+        ignore=[],
+        source_col=source_col
     )
 
 
