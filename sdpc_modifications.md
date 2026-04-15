@@ -1,270 +1,208 @@
-# CLAM 项目 SDPC 格式支持与 Task 配置修改文档
+# SDPC 支持与 DLBCL 任务定制说明
 
-> 本文档记录了 CLAM 项目针对 `.sdpc` 格式 WSI 文件的修改，以及新增的 `task_3_dlbcl_coo` 任务配置。
-> 作为 AI 上下文档，用于理解项目的定制化内容。
+> 最后更新：2026-04-15
+> 用途：说明当前仓库中相对于原始 CLAM 的两类关键定制：
+> 1. `.sdpc` 全切片支持
+> 2. DLBCL COO 任务与多数据集训练流程
 
----
+## 1. 文档定位
 
-## 一、SDPC 格式支持
+原始 CLAM 主要面向通用 WSI 分类任务。当前仓库在此基础上做了与毕业论文直接相关的定制，主要包括：
 
-### 1.1 背景
+- 支持国产扫描仪生成的 `.sdpc` 文件
+- 新增 `task_3_dlbcl_coo`
+- 支持 `nanchang` / `morph` / `tcga` / `all` 多数据集
+- 使用 patient-level split
+- `all` 数据集支持 source-aware split
+- DLBCL 训练流程引入更保守的默认设置和稳定性策略
 
-原始 CLAM 项目仅支持 `.svs`、`.tiff`、`.ndpi` 等标准 WSI 格式，使用 `openslide` 库加载。本项目为支持国产扫描仪生成的 `.sdpc` 格式文件，引入了 `opensdpc` 库，并对相关代码进行了修改。
+## 2. `.sdpc` 支持
 
-### 1.2 修改的文件
+### 2.1 背景
 
-| 文件路径 | 修改内容 |
-|----------|----------|
-| `wsi_core/WholeSlideImage.py` | WSI 加载逻辑、read_region 调用方式 |
-| `extract_features_fp.py` | 特征提取时的 WSI 加载逻辑 |
+原始 CLAM 默认依赖 `openslide` 读取 `.svs`、`.tiff`、`.ndpi` 等常见 WSI 格式。当前项目为了兼容 `.sdpc`，引入了 `opensdpc`。
 
-### 1.3 核心修改详解
+### 2.2 相关文件
 
-#### 1.3.1 WholeSlideImage.py - WSI 加载
+| 文件 | 作用 |
+| --- | --- |
+| [wsi_core/WholeSlideImage.py](wsi_core/WholeSlideImage.py) | WSI 加载与 patch 读取 |
+| [extract_features_fp.py](extract_features_fp.py) | 特征提取时读取 slide |
 
-**位置**: `wsi_core/WholeSlideImage.py` 第 46-52 行
+### 2.3 当前实现要点
 
-```python
-# --- 修改开始 ---
-if path.endswith('.sdpc'):
-    # 使用 opensdpc 加载 sdpc 文件
-    self.wsi = opensdpc.OpenSdpc(path)
-else:
-    # 其他格式（.svs, .tiff 等）依然使用 openslide
-    self.wsi = openslide.open_slide(path)
-# --- 修改结束 ---
-```
+当前逻辑是：
 
-**说明**:
-- 检测文件后缀名是否为 `.sdpc`
-- 如果是，使用 `opensdpc.OpenSdpc()` 加载
-- 否则使用标准的 `openslide.open_slide()` 加载
+- 如果 slide 后缀为 `.sdpc`，使用 `opensdpc.OpenSdpc(...)`
+- 否则仍使用 `openslide.open_slide(...)`
+- `read_region(...)` 后统一 `.convert('RGB')`，保证后续处理接口一致
 
-#### 1.3.2 WholeSlideImage.py - read_region 调用
-
-**位置**: `wsi_core/WholeSlideImage.py` 多处
-
-由于 `opensdpc` 和 `openslide` 的 API 略有不同，需要注意以下几点：
-
-| 场景 | 代码位置 | openslide 兼容处理 |
-|------|----------|-------------------|
-| 组织分割读取 | 第 169 行 | `self.wsi.read_region((0,0), seg_level, self.level_dim[seg_level])` |
-| 可视化读取 | 第 224 行 | `.convert("RGB")` 转换 |
-| Patch 提取 | 第 351 行 | `.convert("RGB")` 转换 |
-| 热图生成 | 第 664、768 行 | `.convert("RGB")` 转换 |
-
-**关键差异**:
-- `opensdpc.OpenSdpc.read_region()` 返回的对象需要调用 `.convert("RGB")` 才能转为 PIL Image
-- `openslide` 的 `read_region` 返回的对象本身已是 RGB 模式，但仍需显式调用以保持兼容
-
-```python
-# 示例：Patch 提取
-patch_PIL = self.wsi.read_region((x,y), patch_level, (patch_size, patch_size)).convert('RGB')
-```
-
-#### 1.3.3 extract_features_fp.py - 特征提取时的加载
-
-**位置**: `extract_features_fp.py` 第 119-127 行
-
-```python
-# 获取文件后缀名
-slide_ext = os.path.splitext(slide_file_path)[1].lower()
-
-if slide_ext == '.sdpc':
-    # 注意这里：改成了首字母大写的 OpenSdpc
-    wsi = opensdpc.OpenSdpc(slide_file_path) 
-else:
-    # 标准格式依然走 openslide
-    wsi = openslide.open_slide(slide_file_path)
-```
-
-### 1.4 依赖安装
+### 2.4 依赖
 
 ```bash
 pip install opensdpc
 ```
 
----
+## 3. DLBCL 任务定制
 
-## 二、Task 配置修改
+### 3.1 新增任务
 
-### 2.1 背景
+当前仓库新增：
 
-原始 CLAM 项目仅支持 `task_1_tumor_vs_normal`（肿瘤 vs 正常二分类）和 `task_2_tumor_subtyping`（肿瘤亚型三分类）两个任务。本项目新增了 `task_3_dlbcl_coo`，用于 DLBCL 淋巴瘤的 GCB vs non-GCB 分型任务。
+- `task_3_dlbcl_coo`
 
-### 2.2 修改的文件
+对应分类任务：
 
-| 文件路径 | 修改内容 |
-|----------|----------|
-| `main.py` | 新增 task 选项、Dataset 配置 |
-| `eval.py` | 支持新 task 的评估 |
-| `create_splits_seq.py` | 支持新 task 的数据划分 |
+- `GCB` vs `non-GCB`
 
-### 2.3 核心修改详解
+核心入口：
 
-#### 2.3.1 main.py - Task 参数定义
+- [main.py](main.py)
+- [eval.py](eval.py)
+- [create_splits_seq.py](create_splits_seq.py)
 
-**位置**: `main.py` 第 130 行
+### 3.2 当前不是单一数据集配置
 
-```python
-parser.add_argument('--task', type=str, 
-    choices=['task_1_tumor_vs_normal', 'task_2_tumor_subtyping', 'task_3_dlbcl_coo'])
-```
+早期版本的 DLBCL 代码和文档曾使用单一 CSV 与单一特征目录，但**当前实现已经不是这样**。
 
-#### 2.3.2 main.py - Dataset 配置
+当前 DLBCL 训练入口支持：
 
-**位置**: `main.py` 第 225-236 行
+- `--dataset nanchang`
+- `--dataset morph`
+- `--dataset tcga`
+- `--dataset all`
 
-```python
-elif args.task == 'task_3_dlbcl_coo':
-    args.n_classes = 2
-    dataset = Generic_MIL_Dataset(
-        csv_path='dataset_csv/gcb_vs_nongcb.csv',
-        data_dir=os.path.join(args.data_root_dir, 'dlbcl_resnet_features'),
-        shuffle=False,
-        seed=args.seed,
-        print_info=True,
-        label_dict={'GCB': 0, 'non-GCB': 1},
-        patient_strat=False,
-        ignore=[]
-    )
-```
+同时支持：
 
-**配置说明**:
+- `--feature_type resnet`
+- `--feature_type uni`
 
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| `csv_path` | `dataset_csv/gcb_vs_nongcb.csv` | DLBCL 分类数据集 CSV |
-| `data_dir` | `dlbcl_resnet_features` | 特征文件目录 |
-| `n_classes` | 2 | 二分类任务（GCB vs non-GCB）|
-| `label_dict` | `{'GCB': 0, 'non-GCB': 1}` | 标签映射 |
-| `patient_strat` | `False` | 按 slide 级别划分（非 patient 级别）|
+### 3.3 当前数据集映射
 
-### 2.4 数据集格式
+| 数据集 | CSV | 特征目录 |
+| --- | --- | --- |
+| nanchang | [dataset_csv/nanchang_dlbcl.csv](dataset_csv/nanchang_dlbcl.csv) | `features/nanchang_<feature_type>_features` |
+| morph | [dataset_csv/dlbcl_morph.csv](dataset_csv/dlbcl_morph.csv) | `features/morph_<feature_type>_features` |
+| tcga | [dataset_csv/tcga_dlbcl.csv](dataset_csv/tcga_dlbcl.csv) | `features/tcga_<feature_type>_features` |
+| all | [dataset_csv/dlbcl_all.csv](dataset_csv/dlbcl_all.csv) | `features/all_<feature_type>_features` |
 
-#### 2.4.1 CSV 文件格式
+## 4. 当前划分策略
 
-**文件**: `dataset_csv/gcb_vs_nongcb.csv`
+### 4.1 patient-level split
 
-```csv
-case_id,slide_id,label
-1375314,1375314A01#3_1,GCB
-1375314,1375314A02#3_2,GCB
-...
-1386008,1386008A01#3_9,non-GCB
-...
-```
+当前 DLBCL 任务使用：
 
-| 列名 | 说明 |
-|------|------|
-| `case_id` | 患者 ID |
-| `slide_id` | 切片 ID（含后缀 `#3_X`）|
-| `label` | 标签：`GCB` 或 `non-GCB` |
+- `patient_strat=True`
 
-#### 2.4.2 特征文件目录结构
+这意味着：
 
-```
-features/
-└── dlbcl_resnet_features/
-    ├── pt_files/
-    │   ├── 1375314A01#3_1.pt
-    │   └── ...
-    └── h5_files/
-        ├── 1375314A01#3_1.h5
-        └── ...
-```
+- 同一患者的不同 slide 不会跨 train/val/test
+- 避免了 slide-level 数据泄露
 
-### 2.5 数据划分目录
+这与部分旧文档中出现的 `patient_strat=False` 已经不同，后者不再是当前标准。
 
-```
-splits/
-└── task_3_dlbcl_coo_100/       # label_frac=1.0 → 100
-    ├── splits_0.csv
-    ├── splits_1.csv
-    └── ...
-    └── splits_9.csv            # 10-Fold 交叉验证
-```
+### 4.2 all 数据集的 source-aware split
 
----
+`all` 数据集包含多来源样本：
 
-## 三、训练与评估命令
+- `nanchang`
+- `morph`
+- `tcga`
 
-### 3.1 训练命令
+当前 [create_splits_seq.py](create_splits_seq.py) 和 [dataset_modules/dataset_generic.py](dataset_modules/dataset_generic.py) 已支持 source-aware split，核心思想是：
+
+- 不只按 label 分层
+- 还按 `(label, source)` 组合分层
+
+目的：
+
+- 避免某一 fold 的 source 分布失衡
+- 降低多源混合实验的偶然性
+
+## 5. 当前 DLBCL 训练增强点
+
+当前 DLBCL 任务在代码层面已经加入多项增强，不应再按旧版 CLAM 默认值理解：
+
+- `monitor_metric = val_auc`
+- 更保守的默认 dropout / reg / lr
+- feature-level augmentation
+- bag 级 patch 采样与 dropout
+- PCA 降维
+- warmup bag-only epochs
+- attention entropy regularization
+- label smoothing
+
+相关代码：
+
+- [main.py](main.py)
+- [utils/core_utils.py](utils/core_utils.py)
+- [utils/feature_aug.py](utils/feature_aug.py)
+- [utils/pca_utils.py](utils/pca_utils.py)
+
+## 6. 当前推荐命令示例
+
+### 6.1 morph + UNI + CLAM_SB
 
 ```bash
-# CLAM_SB (单分支) + weighted_sample
 CUDA_VISIBLE_DEVICES=0 python main.py \
   --task task_3_dlbcl_coo \
-  --data_root_dir /home/shanyiye/CLAM/features \
-  --results_dir /home/shanyiye/CLAM/results \
-  --exp_code dlbcl_gcb_nongcb_clam_sb \
+  --dataset morph \
+  --feature_type uni \
+  --data_root_dir features \
+  --results_dir results \
+  --exp_code morph_baseline_v3 \
   --model_type clam_sb \
-  --drop_out 0.25 \
-  --early_stopping \
-  --lr 2e-4 \
+  --seed 1 \
   --k 10 \
+  --lr 5e-5 \
+  --drop_out 0.5 \
+  --reg 1e-3 \
   --bag_loss ce \
-  --inst_loss svm \
-  --log_data \
-  --embed_dim 1024
-
-# CLAM_SB (无 weighted_sample)
-CUDA_VISIBLE_DEVICES=0 python main.py \
-  --task task_3_dlbcl_coo \
-  --data_root_dir /home/shanyiye/CLAM/features \
-  --results_dir /home/shanyiye/CLAM/results \
-  --exp_code dlbcl_gcb_nongcb_clam_sb_nows \
-  --model_type clam_sb \
-  --drop_out 0.25 \
-  --early_stopping \
-  --lr 2e-4 \
-  --k 10 \
-  --bag_loss ce \
-  --inst_loss svm \
-  --log_data \
-  --embed_dim 1024
-
-# MIL (基线模型)
-CUDA_VISIBLE_DEVICES=1 python main.py \
-  --task task_3_dlbcl_coo \
-  --data_root_dir /home/shanyiye/CLAM/features \
-  --results_dir /home/shanyiye/CLAM/results \
-  --exp_code dlbcl_gcb_nongcb_mil \
-  --model_type mil \
-  --drop_out 0.25 \
-  --early_stopping \
-  --lr 2e-4 \
-  --k 10 \
-  --bag_loss ce \
-  --log_data \
-  --embed_dim 1024
+  --monitor_metric val_auc \
+  --use_pca \
+  --pca_dim 256 \
+  --feature_noise_std 0.02 \
+  --feature_dropout 0.1 \
+  --patch_keep_ratio 0.8 \
+  --max_patches_per_bag 512 \
+  --warmup_bag_only_epochs 10 \
+  --attention_entropy_weight 0.001 \
+  --label_smoothing 0.05 \
+  --bag_weight 0.7 \
+  --B 8
 ```
 
-### 3.2 评估命令
+### 6.2 PCA 实验评估
 
 ```bash
-# 评估 CLAM_SB
-CUDA_VISIBLE_DEVICES=0 python eval.py \
-  --k 10 \
-  --models_exp_code dlbcl_gcb_nongcb_clam_sb_s1 \
-  --save_exp_code dlbcl_gcb_nongcb_clam_sb_eval \
+python eval.py \
   --task task_3_dlbcl_coo \
+  --dataset morph \
+  --feature_type uni \
+  --data_root_dir features \
+  --results_dir results \
+  --models_exp_code morph_baseline_v3_s1 \
+  --save_exp_code morph_baseline_v3_eval \
   --model_type clam_sb \
-  --results_dir /home/shanyiye/CLAM/results \
-  --data_root_dir /home/shanyiye/CLAM/features \
-  --embed_dim 1024 \
-  --seed 1
+  --use_pca \
+  --pca_dim 256 \
+  --k 10
 ```
 
----
+## 7. 当前应废弃的旧理解
 
-## 四、注意事项
+以下说法若出现在旧文档中，均应视为历史状态：
 
-1. **opensdpc 库**: 使用 `.sdpc` 格式时必须安装 `opensdpc` 库
-2. **特征提取**: 确保在特征提取时指定 `--slide_ext .sdpc` 参数
-3. **CSV 格式**: 某些情况下 pandas 读取 CSV 会将 slide_id 转为数值型，需使用 `dtype=` 参数保持字符串格式
-4. **patient_strat**: 当前 `task_3_dlbcl_coo` 使用 `patient_strat=False`，即按 slide 级别划分数据
+- DLBCL 只对应 `gcb_vs_nongcb.csv`
+- DLBCL 只使用 `dlbcl_resnet_features`
+- DLBCL 默认按 slide-level split
+- DLBCL 训练默认 `drop_out 0.25 + lr 2e-4`
 
----
+## 8. 当前结论
 
-*本文档最后更新于 2026-03-14*
+当前 `sdpc_modifications.md` 的作用不再只是“记录一次性改动”，而是作为：
+
+- `.sdpc` 兼容说明
+- DLBCL 定制任务的准现行说明
+
+后续若代码继续变化，应优先保持本文件与 [operation_guide.md](operation_guide.md) 一致。
