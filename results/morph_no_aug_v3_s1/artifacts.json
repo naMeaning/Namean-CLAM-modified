@@ -1,0 +1,254 @@
+{
+  "folds": {
+    "0": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_0_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_0_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_0_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.9285714285714286,
+        "test_auc": 0.8958333333333334,
+        "val_acc": 0.7384615384615385,
+        "val_auc": 0.7230000000000001
+      },
+      "fold": 0,
+      "pca_explained_variance": 0.8185535669326782,
+      "pca_model": "results/morph_no_aug_v3_s1/s_0_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_0.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/0",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/0/events.out.tfevents.1776490787.user-Rack-Server"
+      ]
+    },
+    "1": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_1_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_1_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_1_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.8,
+        "test_auc": 0.8928571428571429,
+        "val_acc": 0.48,
+        "val_auc": 0.44480519480519476
+      },
+      "fold": 1,
+      "pca_explained_variance": 0.8176215887069702,
+      "pca_model": "results/morph_no_aug_v3_s1/s_1_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_1.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/1",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/1/events.out.tfevents.1776494226.user-Rack-Server"
+      ]
+    },
+    "2": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_2_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_2_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_2_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.47619047619047616,
+        "test_auc": 0.4722222222222222,
+        "val_acc": 0.5094339622641509,
+        "val_auc": 0.5234604105571847
+      },
+      "fold": 2,
+      "pca_explained_variance": 0.8176378607749939,
+      "pca_model": "results/morph_no_aug_v3_s1/s_2_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_2.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/2",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/2/events.out.tfevents.1776497449.user-Rack-Server"
+      ]
+    },
+    "3": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_3_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_3_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_3_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.6333333333333333,
+        "test_auc": 0.6203703703703703,
+        "val_acc": 0.574468085106383,
+        "val_auc": 0.618421052631579
+      },
+      "fold": 3,
+      "pca_explained_variance": 0.8220577836036682,
+      "pca_model": "results/morph_no_aug_v3_s1/s_3_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_3.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/3",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/3/events.out.tfevents.1776500446.user-Rack-Server"
+      ]
+    },
+    "4": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_4_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_4_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_4_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.8125,
+        "test_auc": 0.9000000000000001,
+        "val_acc": 0.45999999999999996,
+        "val_auc": 0.4879227053140096
+      },
+      "fold": 4,
+      "pca_explained_variance": 0.8151518702507019,
+      "pca_model": "results/morph_no_aug_v3_s1/s_4_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_4.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/4",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/4/events.out.tfevents.1776502954.user-Rack-Server"
+      ]
+    },
+    "5": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_5_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_5_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_5_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.368421052631579,
+        "test_auc": 0.34444444444444444,
+        "val_acc": 0.7209302325581395,
+        "val_auc": 0.7330316742081449
+      },
+      "fold": 5,
+      "pca_explained_variance": 0.8162456154823303,
+      "pca_model": "results/morph_no_aug_v3_s1/s_5_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_5.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/5",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/5/events.out.tfevents.1776505391.user-Rack-Server"
+      ]
+    },
+    "6": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_6_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_6_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_6_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.75,
+        "test_auc": 0.7619047619047619,
+        "val_acc": 0.6271186440677966,
+        "val_auc": 0.6705128205128206
+      },
+      "fold": 6,
+      "pca_explained_variance": 0.8208993673324585,
+      "pca_model": "results/morph_no_aug_v3_s1/s_6_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_6.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/6",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/6/events.out.tfevents.1776508060.user-Rack-Server"
+      ]
+    },
+    "7": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_7_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_7_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_7_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7333333333333334,
+        "test_auc": 0.8148148148148148,
+        "val_acc": 0.5344827586206897,
+        "val_auc": 0.44696969696969696
+      },
+      "fold": 7,
+      "pca_explained_variance": 0.818841814994812,
+      "pca_model": "results/morph_no_aug_v3_s1/s_7_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_7.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/7",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/7/events.out.tfevents.1776510634.user-Rack-Server"
+      ]
+    },
+    "8": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_8_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_8_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_8_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7692307692307692,
+        "test_auc": 0.8333333333333333,
+        "val_acc": 0.62,
+        "val_auc": 0.6426282051282052
+      },
+      "fold": 8,
+      "pca_explained_variance": 0.8187573552131653,
+      "pca_model": "results/morph_no_aug_v3_s1/s_8_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_8.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/8",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/8/events.out.tfevents.1776513238.user-Rack-Server"
+      ]
+    },
+    "9": {
+      "checkpoint": "results/morph_no_aug_v3_s1/s_9_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_aug_v3_s1/s_9_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_aug_v3_s1/s_9_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7894736842105263,
+        "test_auc": 0.7692307692307692,
+        "val_acc": 0.5797101449275363,
+        "val_auc": 0.6554054054054054
+      },
+      "fold": 9,
+      "pca_explained_variance": 0.8102821111679077,
+      "pca_model": "results/morph_no_aug_v3_s1/s_9_pca.pkl",
+      "pca_model_exists": true,
+      "pca_n_components": 256,
+      "split_csv": "results/morph_no_aug_v3_s1/splits_9.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_aug_v3_s1/9",
+      "tensorboard_event_files": [
+        "results/morph_no_aug_v3_s1/9/events.out.tfevents.1776515607.user-Rack-Server"
+      ]
+    }
+  }
+}

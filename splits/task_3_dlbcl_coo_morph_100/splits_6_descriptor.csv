@@ -1,0 +1,3 @@
+,train,val,test
+GCB,50,20,7
+non-GCB,58,39,9

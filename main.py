@@ -124,6 +124,8 @@ parser.add_argument('--split_dir', type=str, default=None,
                     +'instead of infering from the task and label_frac argument (default: None)')
 parser.add_argument('--log_data', action='store_true', default=False, help='log data using tensorboard')
 parser.add_argument('--testing', action='store_true', default=False, help='debugging tool')
+parser.add_argument('--disable_dlbcl_defaults', action='store_true', default=False,
+                    help='disable task_3_dlbcl_coo automatic regularization defaults for clean ablations')
 
 # --- 训练策略 ---
 parser.add_argument('--early_stopping', action='store_true', default=False, help='enable early stopping')
@@ -220,7 +222,7 @@ seed_torch(args.seed)
 # =============================================================================
 # DLBCL 任务默认参数调整（更保守的配置，减少过拟合）
 # =============================================================================
-if args.task == 'task_3_dlbcl_coo':
+if args.task == 'task_3_dlbcl_coo' and not args.disable_dlbcl_defaults:
     # DLBCL 任务使用更保守的默认参数
     args.drop_out = 0.5  # 原默认值 0.25，更高的 dropout 减少过拟合
     args.reg = 1e-3      # 原默认值 1e-5，更强的权重衰减
@@ -279,11 +281,17 @@ settings = {'num_splits': args.k,
             'feature_dropout': args.feature_dropout,
             'patch_keep_ratio': args.patch_keep_ratio,
             'max_patches_per_bag': args.max_patches_per_bag,
+            'log_data': args.log_data,
+            'disable_dlbcl_defaults': args.disable_dlbcl_defaults,
             'use_pca': args.use_pca,
             'pca_dim': args.pca_dim,
+            'pca_whiten': args.pca_whiten,
             'warmup_bag_only_epochs': args.warmup_bag_only_epochs,
             'attention_entropy_weight': args.attention_entropy_weight,
-            'label_smoothing': args.label_smoothing}
+            'label_smoothing': args.label_smoothing,
+            'use_swa': args.use_swa,
+            'swa_start_epoch': args.swa_start_epoch,
+            'swa_lr': args.swa_lr}
 
 # CLAM 模型额外记录 bag_weight、实例损失函数类型和采样数 B
 if args.model_type in ['clam_sb', 'clam_mb']:
@@ -392,6 +400,4 @@ if __name__ == "__main__":
     results = main(args)
     print("finished!")
     print("end script")
-
-
 

@@ -15,7 +15,8 @@ import numpy as np
 import torch
 from utils.utils import *
 import os
-from utils.file_utils import save_pkl
+import json
+from utils.file_utils import save_pkl, load_pkl
 from dataset_modules.dataset_generic import save_splits
 from models.model_mil import MIL_fc, MIL_fc_mc
 from models.model_clam import CLAM_MB, CLAM_SB
@@ -24,6 +25,74 @@ from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def create_summary_writer(log_dir):
+    """Create a TensorBoard writer with a torch-native fallback."""
+    try:
+        from tensorboardX import SummaryWriter
+    except ImportError:
+        from torch.utils.tensorboard import SummaryWriter
+    return SummaryWriter(log_dir, flush_secs=15)
+
+
+def save_and_verify_pca_model(results_dir, fold, pca_model):
+    """
+    Save the fold-specific PCA model and verify it can be reloaded.
+
+    Raises:
+        RuntimeError: if the PCA artifact is missing or corrupted after save.
+    """
+    pca_path = os.path.join(results_dir, "s_{}_pca.pkl".format(fold))
+    save_pkl(pca_path, pca_model)
+
+    if not os.path.isfile(pca_path):
+        raise RuntimeError(f"Failed to save PCA model for fold {fold}: {pca_path}")
+
+    reloaded_pca = load_pkl(pca_path)
+    if not hasattr(reloaded_pca, 'transform') or not hasattr(reloaded_pca, 'n_components_'):
+        raise RuntimeError(f"Saved PCA artifact is invalid for fold {fold}: {pca_path}")
+
+    return pca_path, reloaded_pca
+
+
+def write_fold_artifacts(results_dir, fold, artifact_record):
+    """Persist a lightweight manifest so each fold's outputs are auditable."""
+    def _json_safe(obj):
+        """Recursively convert numpy scalars/arrays into JSON-serializable Python types."""
+        if isinstance(obj, dict):
+            return {str(key): _json_safe(value) for key, value in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [_json_safe(value) for value in obj]
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.generic):
+            return obj.item()
+        return obj
+
+    manifest_path = os.path.join(results_dir, 'artifacts.json')
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            manifest = json.load(f)
+    else:
+        manifest = {'folds': {}}
+
+    manifest['folds'][str(int(fold))] = _json_safe(artifact_record)
+
+    with open(manifest_path, 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def list_tensorboard_event_files(writer_dir):
+    """Collect TensorBoard event files for manifest/debugging purposes."""
+    if not os.path.isdir(writer_dir):
+        return []
+
+    return sorted([
+        os.path.join(writer_dir, filename)
+        for filename in os.listdir(writer_dir)
+        if filename.startswith('events.out.tfevents.')
+    ])
 
 class Accuracy_Logger(object):
     """分类准确率记录器，按类别分别统计预测正确数与总数。"""
@@ -186,16 +255,33 @@ def train(datasets, cur, args):
         os.mkdir(writer_dir)
 
     if args.log_data:
-        from tensorboardX import SummaryWriter
-        writer = SummaryWriter(writer_dir, flush_secs=15)
+        writer = create_summary_writer(writer_dir)
 
     else:
         writer = None
 
+    split_csv_path = os.path.join(args.results_dir, 'splits_{}.csv'.format(cur))
+    artifact_record = {
+        'fold': cur,
+        'split_csv': split_csv_path,
+        'split_csv_exists': False,
+        'tensorboard_dir': writer_dir if args.log_data else None,
+        'tensorboard_event_files': [],
+        'pca_model': None,
+        'pca_model_exists': False,
+        'checkpoint': os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)),
+        'checkpoint_exists': False,
+        'checkpoint_auc': os.path.join(args.results_dir, "s_{}_checkpoint_auc.pt".format(cur)),
+        'checkpoint_auc_exists': False,
+        'checkpoint_loss': os.path.join(args.results_dir, "s_{}_checkpoint_loss.pt".format(cur)),
+        'checkpoint_loss_exists': False,
+    }
+
     print('\nInit train/val/test splits...', end=' ')
     train_split, val_split, test_split = datasets
     # 将 train/val/test 划分保存为 CSV，便于复现
-    save_splits(datasets, ['train', 'val', 'test'], os.path.join(args.results_dir, 'splits_{}.csv'.format(cur)))
+    save_splits(datasets, ['train', 'val', 'test'], split_csv_path)
+    artifact_record['split_csv_exists'] = os.path.isfile(split_csv_path)
     print('Done!')
     print("Training on {} samples".format(len(train_split)))
     print("Validating on {} samples".format(len(val_split)))
@@ -280,8 +366,20 @@ def train(datasets, cur, args):
         pca_dim = getattr(args, 'pca_dim', 256)
         pca_whiten = getattr(args, 'pca_whiten', False)
         pca_model = fit_pca_from_train_split(train_split, n_components=pca_dim, whiten=pca_whiten)
-        # 保存每个 fold 对应的 PCA 模型，供独立评估时复用完全相同的变换
-        save_pkl(os.path.join(args.results_dir, "s_{}_pca.pkl".format(cur)), pca_model)
+        # 保存并校验每个 fold 对应的 PCA 模型，供独立评估时复用完全相同的变换
+        pca_path, verified_pca = save_and_verify_pca_model(args.results_dir, cur, pca_model)
+        artifact_record['pca_model'] = pca_path
+        artifact_record['pca_model_exists'] = True
+        artifact_record['pca_n_components'] = int(verified_pca.n_components_)
+        if hasattr(verified_pca, 'explained_variance_ratio_'):
+            explained_var = float(np.sum(verified_pca.explained_variance_ratio_))
+            artifact_record['pca_explained_variance'] = explained_var
+            print(f'PCA model saved: {pca_path} (explained_var={explained_var:.4f})')
+            if writer:
+                writer.add_scalar('pca/explained_variance', explained_var, 0)
+        if writer:
+            writer.add_scalar('pca/n_components', artifact_record['pca_n_components'], 0)
+            writer.add_text('artifacts/pca_model', pca_path, 0)
 
     train_loader = get_split_loader(train_split, training=True, testing=args.testing,
                                    weighted=args.weighted_sample, aug_config=aug_config,
@@ -311,6 +409,10 @@ def train(datasets, cur, args):
         early_stopping_loss = None
         early_stopping_auc = None
     print('Done!')
+    if writer:
+        writer.add_text('meta/model_type', args.model_type, 0)
+        writer.add_text('meta/monitor_metric', getattr(args, 'monitor_metric', 'val_loss'), 0)
+        writer.add_text('meta/split_csv', split_csv_path, 0)
 
     for epoch in range(args.max_epochs):
         if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:
@@ -404,6 +506,18 @@ def train(datasets, cur, args):
     results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes)
     print('Test error: {:.4f}, ROC AUC: {:.4f}'.format(test_error, test_auc))
 
+    artifact_record['checkpoint_exists'] = os.path.isfile(artifact_record['checkpoint'])
+    artifact_record['checkpoint_auc_exists'] = os.path.isfile(artifact_record['checkpoint_auc'])
+    artifact_record['checkpoint_loss_exists'] = os.path.isfile(artifact_record['checkpoint_loss'])
+    artifact_record['tensorboard_event_files'] = list_tensorboard_event_files(writer_dir)
+    artifact_record['final_metrics'] = {
+        'val_auc': float(val_auc),
+        'val_acc': float(1 - val_error),
+        'test_auc': float(test_auc),
+        'test_acc': float(1 - test_error),
+    }
+    write_fold_artifacts(args.results_dir, cur, artifact_record)
+
     for i in range(args.n_classes):
         acc, correct, count = acc_logger.get_summary(i)
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
@@ -416,6 +530,8 @@ def train(datasets, cur, args):
         writer.add_scalar('final/val_auc', val_auc, 0)
         writer.add_scalar('final/test_error', test_error, 0)
         writer.add_scalar('final/test_auc', test_auc, 0)
+        writer.add_scalar('artifacts/checkpoint_exists', int(artifact_record['checkpoint_exists']), 0)
+        writer.add_scalar('artifacts/pca_model_exists', int(artifact_record['pca_model_exists']), 0)
         writer.close()
     return results_dict, test_auc, val_auc, 1-test_error, 1-val_error 
 

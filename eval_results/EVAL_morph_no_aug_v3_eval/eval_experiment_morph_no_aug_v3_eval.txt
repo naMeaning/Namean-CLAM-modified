@@ -1,0 +1,1 @@
+{'task': 'task_3_dlbcl_coo', 'split': 'test', 'save_dir': './eval_results/EVAL_morph_no_aug_v3_eval', 'models_dir': 'results/morph_no_aug_v3_s1', 'model_type': 'clam_sb', 'drop_out': 0.25, 'model_size': 'small', 'use_pca': True, 'pca_dim': 256}

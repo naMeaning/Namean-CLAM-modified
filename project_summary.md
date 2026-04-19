@@ -1,5 +1,8 @@
 # CLAM 项目总结文档
 
+> 说明：本文主要保留方法与流程总结价值。
+> 若与当前代码默认行为或推荐命令不一致，请以 [operation_guide.md](operation_guide.md)、[project_understanding.md](project_understanding.md) 和 [docs/消融实验执行方案.md](docs/消融实验执行方案.md) 为准。
+
 > **CLAM**: Clustering-constrained Attention Multiple Instance Learning  
 > **论文**: *Data Efficient and Weakly Supervised Computational Pathology on Whole Slide Images* (Lu et al., Nature Biomedical Engineering, 2021)
 

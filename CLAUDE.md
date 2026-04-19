@@ -45,6 +45,8 @@ python main.py --task task_3_dlbcl_coo --dataset nanchang --exp_code nanchang_cl
 - `--k`: 折数
 - `--monitor_metric`: 早停监控指标（`val_auc` 或 `val_loss`，默认 `val_auc`）
 - `--save_best_auc_ckpt`: 保存 best_auc 和 best_loss 两套 checkpoint
+- `--log_data`: 写 TensorBoard 中间文件到 `results/<exp_code>_s1/<fold>/`
+- `--disable_dlbcl_defaults`: 关闭 DLBCL 自动默认参数，做严格消融时建议开启
 
 ### 模型选择建议
 - `mil`: 最简单的MIL基线，适合调试和对比
@@ -72,11 +74,22 @@ DLBCL 数据集（task_3_dlbcl_coo）已内置更保守的默认参数：
 | `lr` | 5e-5 | 学习率（配合 Cosine Annealing） |
 | `use_swa` | False | SWA 权重平均 |
 
+如需做“关闭增强 / 关闭 warmup”这类严格消融，必须显式加：
+```bash
+--disable_dlbcl_defaults
+```
+否则 DLBCL 默认值会把这些参数重新改回推荐配置。
+
 **评估时指定 checkpoint 类型**:
 ```bash
 python eval.py --ckpt_type auc ...  # 使用 best_val_auc checkpoint
 python eval.py --ckpt_type loss ... # 使用 best_val_loss checkpoint
 ```
+
+注意：
+- `--ckpt_type auc` 只有在训练时加了 `--save_best_auc_ckpt` 才能使用
+- `--use_pca` 评估依赖每个 fold 的 `s_<fold>_pca.pkl`
+- 对旧实验若缺少 `s_<fold>_pca.pkl`，可先运行 `backfill_pca_models.py` 回填 PCA 模型，再评估
 
 **DLBCL 标准训练命令（v3 版本，含 Cosine Annealing + SWA + PCA）**:
 ```bash
@@ -218,6 +231,30 @@ python eval.py --drop_out 0.25 --models_exp_code task_1_tumor_vs_normal_100_s1 -
 # DLBCL数据集评估
 python eval.py --task task_3_dlbcl_coo --dataset nanchang --models_exp_code nanchang_clam_sb_s1 ...
 ```
+
+### 旧实验回填 PCA 模型
+```bash
+python backfill_pca_models.py \
+    --task task_3_dlbcl_coo \
+    --dataset morph \
+    --feature_type uni \
+    --data_root_dir features \
+    --results_dir results \
+    --models_exp_code morph_uni_clam_sb_v3_s1 \
+    --pca_dim 256 --k 10
+```
+
+### 训练产物说明
+
+训练目录 `results/<exp_code>_s1/` 中，重点关注以下文件：
+
+- `s_<fold>_checkpoint.pt`: 默认最佳 checkpoint
+- `s_<fold>_checkpoint_auc.pt`: `--save_best_auc_ckpt` 时生成的 best AUC checkpoint
+- `s_<fold>_checkpoint_loss.pt`: `--save_best_auc_ckpt` 时生成的 best loss checkpoint
+- `s_<fold>_pca.pkl`: 使用 PCA 时每个 fold 的 PCA 模型
+- `split_<fold>_results.pkl`: 测试集预测结果缓存，不是 PCA 模型
+- `artifacts.json`: 每个 fold 的产物清单与最终指标
+- `<fold>/events.out.tfevents.*`: TensorBoard 日志
 
 ### 数据划分生成
 ```bash

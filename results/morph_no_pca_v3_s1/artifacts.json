@@ -1,0 +1,214 @@
+{
+  "folds": {
+    "0": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_0_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_0_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_0_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.9285714285714286,
+        "test_auc": 0.9583333333333334,
+        "val_acc": 0.7538461538461538,
+        "val_auc": 0.738
+      },
+      "fold": 0,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_0.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "1": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_1_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_1_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_1_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7333333333333334,
+        "test_auc": 0.9107142857142857,
+        "val_acc": 0.43999999999999995,
+        "val_auc": 0.44805194805194803
+      },
+      "fold": 1,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_1.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "2": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_2_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_2_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_2_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.4285714285714286,
+        "test_auc": 0.5648148148148148,
+        "val_acc": 0.4528301886792453,
+        "val_auc": 0.4662756598240469
+      },
+      "fold": 2,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_2.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "3": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_3_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_3_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_3_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.6,
+        "test_auc": 0.6388888888888888,
+        "val_acc": 0.6170212765957447,
+        "val_auc": 0.5827067669172933
+      },
+      "fold": 3,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_3.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "4": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_4_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_4_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_4_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.6875,
+        "test_auc": 0.8,
+        "val_acc": 0.52,
+        "val_auc": 0.5410628019323671
+      },
+      "fold": 4,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_4.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "5": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_5_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_5_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_5_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.368421052631579,
+        "test_auc": 0.28888888888888886,
+        "val_acc": 0.6744186046511628,
+        "val_auc": 0.6990950226244345
+      },
+      "fold": 5,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_5.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "6": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_6_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_6_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_6_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.625,
+        "test_auc": 0.746031746031746,
+        "val_acc": 0.576271186440678,
+        "val_auc": 0.5692307692307692
+      },
+      "fold": 6,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_6.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "7": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_7_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_7_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_7_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.8,
+        "test_auc": 0.8333333333333334,
+        "val_acc": 0.5689655172413793,
+        "val_auc": 0.4545454545454546
+      },
+      "fold": 7,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_7.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "8": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_8_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_8_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_8_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7307692307692308,
+        "test_auc": 0.7638888888888888,
+        "val_acc": 0.54,
+        "val_auc": 0.6298076923076923
+      },
+      "fold": 8,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_8.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    },
+    "9": {
+      "checkpoint": "results/morph_no_pca_v3_s1/s_9_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_v3_s1/s_9_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_v3_s1/s_9_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.7894736842105263,
+        "test_auc": 0.858974358974359,
+        "val_acc": 0.5652173913043479,
+        "val_auc": 0.6486486486486486
+      },
+      "fold": 9,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_v3_s1/splits_9.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": null,
+      "tensorboard_event_files": []
+    }
+  }
+}

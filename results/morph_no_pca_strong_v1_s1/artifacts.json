@@ -1,0 +1,27 @@
+{
+  "folds": {
+    "0": {
+      "checkpoint": "results/morph_no_pca_strong_v1_s1/s_0_checkpoint.pt",
+      "checkpoint_auc": "results/morph_no_pca_strong_v1_s1/s_0_checkpoint_auc.pt",
+      "checkpoint_auc_exists": false,
+      "checkpoint_exists": true,
+      "checkpoint_loss": "results/morph_no_pca_strong_v1_s1/s_0_checkpoint_loss.pt",
+      "checkpoint_loss_exists": false,
+      "final_metrics": {
+        "test_acc": 0.9285714285714286,
+        "test_auc": 0.9375,
+        "val_acc": 0.7384615384615385,
+        "val_auc": 0.742
+      },
+      "fold": 0,
+      "pca_model": null,
+      "pca_model_exists": false,
+      "split_csv": "results/morph_no_pca_strong_v1_s1/splits_0.csv",
+      "split_csv_exists": true,
+      "tensorboard_dir": "results/morph_no_pca_strong_v1_s1/0",
+      "tensorboard_event_files": [
+        "results/morph_no_pca_strong_v1_s1/0/events.out.tfevents.1776563465.user-Rack-Server"
+      ]
+    }
+  }
+}

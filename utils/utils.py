@@ -70,15 +70,27 @@ def get_simple_loader(dataset, batch_size=1, num_workers=1):
 	loader = DataLoader(dataset, batch_size=batch_size, sampler = sampler.SequentialSampler(dataset), collate_fn = collate_MIL, **kwargs)
 	return loader 
 
-def get_split_loader(split_dataset, training = False, testing = False, weighted = False):
+def get_split_loader(split_dataset, training = False, testing = False, weighted = False,
+                     aug_config=None, pca_model=None, pca_dim=None):
 	"""
 	根据当前模式返回合适的 DataLoader：
 	  - testing=True  : 随机子集采样（仅取 10%，用于快速调试）
 	  - training=True, weighted=True : 加权随机采样（解决类别不平衡）
 	  - training=True, weighted=False: 完全随机采样
 	  - 其他（验证/测试）: 顺序采样
+
+	aug_config, pca_model, pca_dim 用于将特征增强/PCA 配置传递给 dataset。
 	"""
 	kwargs = {'num_workers': 4} if device.type == "cuda" else {}
+
+	# 设置 dataset 级别的增强/PCA 配置
+	split_dataset.training = training
+	if aug_config is not None:
+		split_dataset.aug_config = aug_config
+	if pca_model is not None:
+		split_dataset.pca_model = pca_model
+		split_dataset.pca_dim = pca_dim
+
 	if not testing:
 		if training:
 			if weighted:
@@ -123,7 +135,7 @@ def print_network(net):
 
 
 def generate_split(cls_ids, val_num, test_num, samples, n_splits = 5,
-	seed = 7, label_frac = 1.0, custom_test_ids = None):
+	seed = 7, label_frac = 1.0, custom_test_ids = None, source_aware = False):
 	"""
 	K-Fold 数据集划分生成器（yield 版本，节省内存）。
 	每次 yield 返回 (train_ids, val_ids, test_ids) 三元组。
@@ -132,9 +144,10 @@ def generate_split(cls_ids, val_num, test_num, samples, n_splits = 5,
 	  1. 若提供 custom_test_ids，则从候选集中排除这些 ID
 	  2. 按类别采样 val_ids 和 test_ids
 	  3. 剩余样本按 label_frac 比例采样为训练集（半监督场景）
+	  4. 若 source_aware=True，则在每个类内部按 source 分组采样
 	"""
 	indices = np.arange(samples).astype(int)
-	
+
 	if custom_test_ids is not None:
 		indices = np.setdiff1d(indices, custom_test_ids)
 
@@ -143,31 +156,86 @@ def generate_split(cls_ids, val_num, test_num, samples, n_splits = 5,
 		all_val_ids = []
 		all_test_ids = []
 		sampled_train_ids = []
-		
+
 		if custom_test_ids is not None: # pre-built test split, do not need to sample
 			all_test_ids.extend(custom_test_ids)
 
 		for c in range(len(val_num)):
-			possible_indices = np.intersect1d(cls_ids[c], indices) #all indices of this class
-			val_ids = np.random.choice(possible_indices, val_num[c], replace = False) # validation ids
+			if source_aware:
+				# Source-aware: cls_ids[c] is a list of arrays, one per source
+				# Sample proportionally from each source subgroup
+				source_groups = cls_ids[c]
+				total_val = val_num[c]
+				total_test = test_num[c]
 
-			remaining_ids = np.setdiff1d(possible_indices, val_ids) #indices of this class left after validation
-			all_val_ids.extend(val_ids)
+				val_ids_for_class = []
+				test_ids_for_class = []
+				remaining_ids_for_class = []
 
-			if custom_test_ids is None: # sample test split
+				# Calculate proportions for each source group
+				group_sizes = [len(g) for g in source_groups]
+				total_size = sum(group_sizes)
 
-				test_ids = np.random.choice(remaining_ids, test_num[c], replace = False)
-				remaining_ids = np.setdiff1d(remaining_ids, test_ids)
-				all_test_ids.extend(test_ids)
+				if total_size == 0:
+					continue
 
-			if label_frac == 1:
-				sampled_train_ids.extend(remaining_ids)
-			
+				# Proportionally allocate val and test counts to each source
+				for gi, group_indices in enumerate(source_groups):
+					group_prop = len(group_indices) / total_size
+					n_val = max(1, round(total_val * group_prop))
+					n_test = max(1, round(total_test * group_prop))
+
+					possible_indices = np.intersect1d(group_indices, indices)
+					if len(possible_indices) < n_val:
+						n_val = len(possible_indices)
+					if len(possible_indices) < n_val + n_test:
+						n_test = max(0, len(possible_indices) - n_val)
+
+					if n_val > 0:
+						val_ids = np.random.choice(possible_indices, n_val, replace=False)
+						remaining = np.setdiff1d(possible_indices, val_ids)
+						val_ids_for_class.extend(val_ids)
+					else:
+						remaining = possible_indices
+
+					if n_test > 0 and len(remaining) > n_test:
+						test_ids = np.random.choice(remaining, n_test, replace=False)
+						remaining = np.setdiff1d(remaining, test_ids)
+						test_ids_for_class.extend(test_ids)
+
+					remaining_ids_for_class.extend(remaining)
+
+				all_val_ids.extend(val_ids_for_class)
+				all_test_ids.extend(test_ids_for_class)
+
+				if label_frac == 1:
+					sampled_train_ids.extend(remaining_ids_for_class)
+				else:
+					sample_num = math.ceil(len(remaining_ids_for_class) * label_frac)
+					sampled_train_ids.extend(remaining_ids_for_class[:sample_num])
+
 			else:
-				# 半监督：只使用 label_frac 比例的训练样本
-				sample_num  = math.ceil(len(remaining_ids) * label_frac)
-				slice_ids = np.arange(sample_num)
-				sampled_train_ids.extend(remaining_ids[slice_ids])
+				# Original logic: treat each class as a single group
+				possible_indices = np.intersect1d(cls_ids[c], indices) #all indices of this class
+				val_ids = np.random.choice(possible_indices, val_num[c], replace = False) # validation ids
+
+				remaining_ids = np.setdiff1d(possible_indices, val_ids) #indices of this class left after validation
+				all_val_ids.extend(val_ids)
+
+				if custom_test_ids is None: # sample test split
+
+					test_ids = np.random.choice(remaining_ids, test_num[c], replace = False)
+					remaining_ids = np.setdiff1d(remaining_ids, test_ids)
+					all_test_ids.extend(test_ids)
+
+				if label_frac == 1:
+					sampled_train_ids.extend(remaining_ids)
+
+				else:
+					# 半监督：只使用 label_frac 比例的训练样本
+					sample_num  = math.ceil(len(remaining_ids) * label_frac)
+					slice_ids = np.arange(sample_num)
+					sampled_train_ids.extend(remaining_ids[slice_ids])
 
 		yield sampled_train_ids, all_val_ids, all_test_ids
 
